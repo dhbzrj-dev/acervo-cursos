@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import { pool } from "../db/pool.js";
 
 function slug(text: string) {
@@ -78,27 +78,11 @@ export async function adminRoutes(app: FastifyInstance) {
     const id = b.id || slug(b.name);
     const benefits = Array.isArray(b.benefits)
       ? b.benefits
-      : String(b.benefits || "")
-          .split("\n")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-
+      : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     await pool.query(
-      `INSERT INTO courses
-        (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active)
+      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        id,
-        b.category_id,
-        b.name,
-        b.description || "",
-        benefits,
-        b.cover_url || "",
-        Number(b.price_stars || 0),
-        b.invite_link || "",
-        b.channel_id || "",
-        b.is_active !== false,
-      ]
+      [id, b.category_id, b.name, b.description || "", benefits, b.cover_url || "", Number(b.price_stars || 0), b.invite_link || "", b.channel_id || "", b.is_active !== false]
     );
     return { ok: true, id };
   });
@@ -108,35 +92,10 @@ export async function adminRoutes(app: FastifyInstance) {
     const b = request.body as any;
     const benefits = Array.isArray(b.benefits)
       ? b.benefits
-      : String(b.benefits || "")
-          .split("\n")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-
+      : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     await pool.query(
-      `UPDATE courses SET
-        category_id = $1,
-        name = $2,
-        description = $3,
-        benefits = $4,
-        cover_url = $5,
-        price_stars = $6,
-        invite_link = $7,
-        channel_id = $8,
-        is_active = $9
-       WHERE id = $10`,
-      [
-        b.category_id,
-        b.name,
-        b.description || "",
-        benefits,
-        b.cover_url || "",
-        Number(b.price_stars || 0),
-        b.invite_link || "",
-        b.channel_id || "",
-        b.is_active !== false,
-        request.params.id,
-      ]
+      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9 WHERE id=$10`,
+      [b.category_id, b.name, b.description || "", benefits, b.cover_url || "", Number(b.price_stars || 0), b.invite_link || "", b.channel_id || "", b.is_active !== false, request.params.id]
     );
     return { ok: true };
   });
@@ -149,36 +108,21 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post("/admin/invite-link", async (request) => {
     requireAdmin(request);
-    const b = request.body as {
-      channel_id: string;
-      price_stars: number;
-      name?: string;
-    };
-
+    const body = request.body as { channel_id: string; price_stars: number; name?: string };
     const token = process.env.BOT_TOKEN;
-    if (!token) {
-      return { ok: false, error: "BOT_TOKEN ausente" };
-    }
-
-    const res = await fetch(`https://api.telegram.org/bot${token}/createChatInviteLink`, {
+    if (!token) return { ok: false, error: "BOT_TOKEN ausente" };
+    const telegramRes = await fetch(`https://api.telegram.org/bot${token}/createChatInviteLink`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: b.channel_id,
-        name: b.name || "Assinatura",
+        chat_id: body.channel_id,
+        name: body.name || "Assinatura",
         subscription_period: 2592000,
-        subscription_price: Number(b.price_stars),
+        subscription_price: Number(body.price_stars),
       }),
     });
-
-    const data = await res.json();
-    if (!data.ok) {
-      return { ok: false, error: data.description || "Falha ao criar invite" };
-    }
-
-    return {
-      ok: true,
-      invite_link: data.result.invite_link,
-    };
+    const telegramJson: any = await telegramRes.json();
+    if (!telegramJson.ok) return { ok: false, error: telegramJson.description || "Falha ao criar invite" };
+    return { ok: true, invite_link: telegramJson.result.invite_link };
   });
 }
