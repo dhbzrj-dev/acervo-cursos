@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: acervo
+      POSTGRES_PASSWORD: acervo
+      POSTGRES_DB: acervo_cursos
+    ports:
+      - "5432:5432"
+    volumes:
+      - acervo_pg_data:/var/lib/postgresql/data
+
+volumes:
+  acervo_pg_data:

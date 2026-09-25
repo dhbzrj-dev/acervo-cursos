@@ -1,0 +1,21 @@
+{
+  "name": "acervo-cursos-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/bot.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/bot.js",
+    "create-invite-link": "tsx src/scripts/createInviteLink.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "grammy": "^1.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}
