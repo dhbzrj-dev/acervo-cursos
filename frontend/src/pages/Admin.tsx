@@ -1,184 +1,196 @@
-import type { FastifyInstance } from "fastify";
-import { pool } from "../db/pool.js";
+import { useEffect, useState } from "react";
 
-function slug(text: string) {
-  return String(text)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+type Category = {
+  id: string;
+  name: string;
+  emoji?: string;
+  order?: number;
+};
 
-function requireAdmin(request: { headers: Record<string, unknown> }) {
-  const header = String(request.headers.authorization || "");
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const password = process.env.ADMIN_PASSWORD || "";
-  if (!password || token !== password) {
-    const err: Error & { statusCode?: number } = new Error("Unauthorized");
-    err.statusCode = 401;
-    throw err;
-  }
-}
+type Course = {
+  id: string;
+  name: string;
+  category_id: string;
+  description?: string;
+  benefits?: string[];
+  cover_url?: string;
+  price_stars: number;
+  invite_link?: string;
+  channel_id?: string;
+  is_active?: boolean;
+};
 
-export async function adminRoutes(app: FastifyInstance) {
-  app.post("/admin/login", async (request, reply) => {
-    const body = (request.body || {}) as { password?: string };
-    const password = process.env.ADMIN_PASSWORD || "";
-    if (!password || body.password !== password) {
-      return reply.code(401).send({ ok: false, error: "Senha inválida." });
-    }
-    return { ok: true, token: password };
+export default function Admin() {
+  const [password, setPassword] = useState(localStorage.getItem("admin_token") || "");
+  const [ok, setOk] = useState(!!localStorage.getItem("admin_token"));
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [catName, setCatName] = useState("");
+  const [catEmoji, setCatEmoji] = useState("📁");
+  const [form, setForm] = useState({
+    name: "",
+    category_id: "",
+    description: "",
+    benefits: "",
+    cover_url: "",
+    price_stars: 100,
+    invite_link: "",
+    channel_id: "",
+    is_active: true,
   });
 
-  app.get("/admin/categories", async (request) => {
-    requireAdmin(request);
-    const { rows } = await pool.query(
-      "SELECT id, name, emoji, \"order\" FROM categories ORDER BY \"order\", name"
-    );
-    return rows;
-  });
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${password}`,
+  };
 
-  app.post("/admin/categories", async (request) => {
-    requireAdmin(request);
-    const b = request.body as { name: string; emoji?: string; order?: number };
-    const id = slug(b.name);
-    await pool.query(
-      "INSERT INTO categories (id, name, emoji, \"order\") VALUES ($1, $2, $3, $4)",
-      [id, b.name, b.emoji || "📁", Number(b.order ?? 0)]
-    );
-    return { ok: true, id };
-  });
-
-  app.put<{ Params: { id: string } }>("/admin/categories/:id", async (request) => {
-    requireAdmin(request);
-    const b = request.body as { name: string; emoji?: string; order?: number };
-    await pool.query(
-      "UPDATE categories SET name = $1, emoji = $2, \"order\" = $3 WHERE id = $4",
-      [b.name, b.emoji || "📁", Number(b.order ?? 0), request.params.id]
-    );
-    return { ok: true };
-  });
-
-  app.delete<{ Params: { id: string } }>("/admin/categories/:id", async (request) => {
-    requireAdmin(request);
-    await pool.query("DELETE FROM categories WHERE id = $1", [request.params.id]);
-    return { ok: true };
-  });
-
-  app.get("/admin/courses", async (request) => {
-    requireAdmin(request);
-    const { rows } = await pool.query("SELECT * FROM courses ORDER BY name");
-    return rows;
-  });
-
-  app.post("/admin/courses", async (request) => {
-    requireAdmin(request);
-    const b = request.body as any;
-    const id = b.id || slug(b.name);
-    const benefits = Array.isArray(b.benefits)
-      ? b.benefits
-      : String(b.benefits || "")
-          .split("\n")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-
-    await pool.query(
-      `INSERT INTO courses
-        (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        id,
-        b.category_id,
-        b.name,
-        b.description || "",
-        benefits,
-        b.cover_url || "",
-        Number(b.price_stars || 0),
-        b.invite_link || "",
-        b.channel_id || "",
-        b.is_active !== false,
-      ]
-    );
-    return { ok: true, id };
-  });
-
-  app.put<{ Params: { id: string } }>("/admin/courses/:id", async (request) => {
-    requireAdmin(request);
-    const b = request.body as any;
-    const benefits = Array.isArray(b.benefits)
-      ? b.benefits
-      : String(b.benefits || "")
-          .split("\n")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-
-    await pool.query(
-      `UPDATE courses SET
-        category_id = $1,
-        name = $2,
-        description = $3,
-        benefits = $4,
-        cover_url = $5,
-        price_stars = $6,
-        invite_link = $7,
-        channel_id = $8,
-        is_active = $9
-       WHERE id = $10`,
-      [
-        b.category_id,
-        b.name,
-        b.description || "",
-        benefits,
-        b.cover_url || "",
-        Number(b.price_stars || 0),
-        b.invite_link || "",
-        b.channel_id || "",
-        b.is_active !== false,
-        request.params.id,
-      ]
-    );
-    return { ok: true };
-  });
-
-  app.delete<{ Params: { id: string } }>("/admin/courses/:id", async (request) => {
-    requireAdmin(request);
-    await pool.query("DELETE FROM courses WHERE id = $1", [request.params.id]);
-    return { ok: true };
-  });
-
-  app.post("/admin/invite-link", async (request) => {
-    requireAdmin(request);
-    const b = request.body as {
-      channel_id: string;
-      price_stars: number;
-      name?: string;
-    };
-
-    const token = process.env.BOT_TOKEN;
-    if (!token) {
-      return { ok: false, error: "BOT_TOKEN ausente" };
-    }
-
-    const res = await fetch(`https://api.telegram.org/bot${token}/createChatInviteLink`, {
+  async function login(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: b.channel_id,
-        name: b.name || "Assinatura",
-        subscription_period: 2592000,
-        subscription_price: Number(b.price_stars),
-      }),
+      body: JSON.stringify({ password }),
     });
-
-    const data = await res.json();
-    if (!data.ok) {
-      return { ok: false, error: data.description || "Falha ao criar invite" };
+    if (!res.ok) {
+      alert("Senha errada");
+      return;
     }
+    localStorage.setItem("admin_token", password);
+    setOk(true);
+  }
 
-    return {
-      ok: true,
-      invite_link: data.result.invite_link,
-    };
-  });
+  async function load() {
+    const [cats, list] = await Promise.all([
+      fetch(`${import.meta.env.VITE_API_URL}/admin/categories`, { headers }).then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL}/admin/courses`, { headers }).then((r) => r.json()),
+    ]);
+    setCategories(cats);
+    setCourses(list);
+  }
+
+  useEffect(() => {
+    if (ok) load();
+  }, [ok]);
+
+  async function createCategory(e: React.FormEvent) {
+    e.preventDefault();
+    await fetch(`${import.meta.env.VITE_API_URL}/admin/categories`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: catName, emoji: catEmoji, order: categories.length + 1 }),
+    });
+    setCatName("");
+    load();
+  }
+
+  async function createCourse(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/courses`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(form),
+    });
+    if (!res.ok) {
+      alert("Erro ao salvar curso");
+      return;
+    }
+    alert("Curso salvo");
+    load();
+  }
+
+  async function removeCourse(id: string) {
+    if (!confirm("Apagar este curso?")) return;
+    await fetch(`${import.meta.env.VITE_API_URL}/admin/courses/${id}`, {
+      method: "DELETE",
+      headers,
+    });
+    load();
+  }
+
+  if (!ok) {
+    return (
+      <form onSubmit={login} className="mx-auto max-w-sm p-6">
+        <h1 className="mb-4 text-2xl font-bold">Admin</h1>
+        <input
+          type="password"
+          className="mb-3 w-full rounded-xl bg-white/10 p-3"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Senha"
+        />
+        <button className="w-full rounded-xl bg-white text-black p-3 font-semibold">
+          Entrar
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl p-6 pb-20">
+      <h1 className="mb-6 text-2xl font-bold">Painel admin</h1>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">Nova categoria</h2>
+        <form onSubmit={createCategory} className="flex gap-2">
+          <input
+            className="w-20 rounded-xl bg-white/10 p-3"
+            value={catEmoji}
+            onChange={(e) => setCatEmoji(e.target.value)}
+          />
+          <input
+            className="flex-1 rounded-xl bg-white/10 p-3"
+            value={catName}
+            onChange={(e) => setCatName(e.target.value)}
+            placeholder="Nome da categoria"
+          />
+          <button className="rounded-xl bg-white text-black px-4 font-semibold">Criar</button>
+        </form>
+        <ul className="mt-3 space-y-1">
+          {categories.map((c) => (
+            <li key={c.id}>
+              {c.emoji} {c.name}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">Novo curso</h2>
+        <form onSubmit={createCourse} className="grid gap-3">
+          <input className="rounded-xl bg-white/10 p-3" placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <select className="rounded-xl bg-white/10 p-3" value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+            <option value="">Categoria</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.emoji} {c.name}
+              </option>
+            ))}
+          </select>
+          <textarea className="rounded-xl bg-white/10 p-3" placeholder="Descrição" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <textarea className="rounded-xl bg-white/10 p-3" placeholder="Benefícios (um por linha)" value={form.benefits} onChange={(e) => setForm({ ...form, benefits: e.target.value })} />
+          <input className="rounded-xl bg-white/10 p-3" placeholder="URL da capa" value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} />
+          <input className="rounded-xl bg-white/10 p-3" type="number" placeholder="Stars" value={form.price_stars} onChange={(e) => setForm({ ...form, price_stars: Number(e.target.value) })} />
+          <input className="rounded-xl bg-white/10 p-3" placeholder="Invite link https://t.me/+" value={form.invite_link} onChange={(e) => setForm({ ...form, invite_link: e.target.value })} />
+          <input className="rounded-xl bg-white/10 p-3" placeholder="Channel ID -100..." value={form.channel_id} onChange={(e) => setForm({ ...form, channel_id: e.target.value })} />
+          <button className="rounded-xl bg-white text-black p-3 font-semibold">Salvar curso</button>
+        </form>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Cursos</h2>
+        <ul className="space-y-2">
+          {courses.map((c) => (
+            <li key={c.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
+              <span>
+                {c.name} — {c.price_stars} ★
+              </span>
+              <button onClick={() => removeCourse(c.id)} className="text-red-400">
+                Apagar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
 }
