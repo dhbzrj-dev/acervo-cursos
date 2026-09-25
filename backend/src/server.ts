@@ -5,6 +5,7 @@ import { categoriesRoutes } from "./routes/categories.js";
 import { coursesRoutes } from "./routes/courses.js";
 import { meRoutes } from "./routes/me.js";
 import { internalRoutes } from "./routes/internal.js";
+import { adminRoutes } from "./routes/admin.js";
 import { closePool, pool } from "./db/pool.js";
 
 const app = Fastify({
@@ -25,6 +26,7 @@ await app.register(categoriesRoutes);
 await app.register(coursesRoutes);
 await app.register(meRoutes);
 await app.register(internalRoutes);
+await app.register(adminRoutes);
 
 app.get("/health", async () => {
   // Ping simples no banco — falha rápido se a DATABASE_URL estiver errada.

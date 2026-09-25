@@ -5,12 +5,13 @@ import CoursePage from "@/pages/CoursePage";
 import MyCourses from "@/pages/MyCourses";
 import Categories from "@/pages/Categories";
 import Profile from "@/pages/Profile";
+import Admin from "@/pages/Admin";
 
 export default function App() {
   const location = useLocation();
-  // A página do curso tem seu próprio botão sticky em tela cheia;
-  // esconder a bottom nav nela evita dois CTAs competindo por atenção.
-  const hideBottomNav = location.pathname.startsWith("/curso/");
+  const hideBottomNav =
+    location.pathname.startsWith("/curso/") ||
+    location.pathname.startsWith("/admin");
 
   return (
     <div className="min-h-screen bg-bg text-ink">
@@ -20,8 +21,8 @@ export default function App() {
         <Route path="/meus-cursos" element={<MyCourses />} />
         <Route path="/categorias" element={<Categories />} />
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
-
       {!hideBottomNav && <BottomNav />}
     </div>
   );
