@@ -86,7 +86,11 @@ export default function Admin() {
       method: "POST", headers,
       body: JSON.stringify({ channel_id: form.channel_id, price_stars: form.price_stars, name: form.name }),
     });
-    const data = await res.json();
+    const data = (await res.json()) as {
+      ok: boolean;
+      description?: string;
+      result?: { invite_link: string };
+    };
     if (!data.ok) { alert(data.error || "Falha ao gerar invite"); return; }
     setForm({ ...form, invite_link: data.invite_link });
     alert("Invite gerado. Clique em salvar.");
