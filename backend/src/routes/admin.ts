@@ -146,4 +146,39 @@ export async function adminRoutes(app: FastifyInstance) {
     await pool.query("DELETE FROM courses WHERE id = $1", [request.params.id]);
     return { ok: true };
   });
+
+  app.post("/admin/invite-link", async (request) => {
+    requireAdmin(request);
+    const b = request.body as {
+      channel_id: string;
+      price_stars: number;
+      name?: string;
+    };
+
+    const token = process.env.BOT_TOKEN;
+    if (!token) {
+      return { ok: false, error: "BOT_TOKEN ausente" };
+    }
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/createChatInviteLink`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: b.channel_id,
+        name: b.name || "Assinatura",
+        subscription_period: 2592000,
+        subscription_price: Number(b.price_stars),
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      return { ok: false, error: data.description || "Falha ao criar invite" };
+    }
+
+    return {
+      ok: true,
+      invite_link: data.result.invite_link,
+    };
+  });
 }
