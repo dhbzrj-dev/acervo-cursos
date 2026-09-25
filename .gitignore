@@ -1,4 +1,7 @@
-.env
+.egit commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/dhbzrj-dev/acervo-cursos.git
+git push -u origin mainnv
 backend/.env
 bot/.env
 frontend/.env
