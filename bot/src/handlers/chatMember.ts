@@ -2,33 +2,20 @@ import type { Bot } from "grammy";
 import { deactivateSubscription, upsertSubscription } from "../services/backendClient.js";
 import { findCourseByChannelId, findCourseByInviteLink } from "../services/coursesCache.js";
 
-/**
- * `chat_member` é o update que o Telegram manda quando o status de alguém
- * muda num canal onde o bot é admin — inclusive quando a assinatura paga
- * (Stars) é criada, renovada ou expira.
- *
- * Referência dos campos usados aqui:
- * https://core.telegram.org/bots/api#chatmemberupdated
- * https://core.telegram.org/bots/api#chatmembermember (campo `until_date`,
- * presente quando o membro entrou via link de assinatura)
- *
- * Importante: como esse é um recurso relativamente novo da Bot API, vale
- * conferir a documentação oficial ao subir para produção — o Telegram já
- * mudou detalhes desse fluxo antes (ex: quais status exatos ocorrem quando
- * uma cobrança falha vs. quando o usuário cancela manualmente).
- */
-
 const ACTIVE_STATUSES = new Set(["member", "administrator", "creator"]);
 const INACTIVE_STATUSES = new Set(["left", "kicked", "restricted"]);
 
-/** Remove o prefixo -100 do id do canal para montar o link t.me/c/<id>/1. */
 function channelDeepLink(chatId: number): string {
   const raw = String(chatId).replace(/^-100/, "").replace(/^-/, "");
   return `https://t.me/c/${raw}/1`;
 }
 
 function toIsoDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
+}
+
+function escapeMd(text: string): string {
+  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 
 export function registerChatMemberHandler(bot: Bot) {
@@ -42,11 +29,9 @@ export function registerChatMemberHandler(bot: Bot) {
         (await findCourseByChannelId(chat.id)) ??
         (invite_link ? await findCourseByInviteLink(invite_link.invite_link) : null);
 
-      if (!course) {
-        // chat_member de um canal que não é nenhum dos nossos cursos —
-        // ignora silenciosamente (o bot pode estar em outros grupos/canais).
-        return;
-      }
+      if (!course) return;
+
+      const courseName = escapeMd((course as { name?: string }).name || course.id);
 
       const becameActive =
         ACTIVE_STATUSES.has(new_chat_member.status) &&
@@ -56,9 +41,6 @@ export function registerChatMemberHandler(bot: Bot) {
         ACTIVE_STATUSES.has(old_chat_member.status);
 
       if (becameActive) {
-        // `until_date` só existe em ChatMemberMember, quando o ingresso foi
-        // via link de assinatura paga; fora desse fluxo, cai no fallback de
-        // 30 dias a partir de agora.
         const untilDate =
           "until_date" in new_chat_member && new_chat_member.until_date
             ? new_chat_member.until_date
@@ -71,11 +53,42 @@ export function registerChatMemberHandler(bot: Bot) {
           channelDeepLink: channelDeepLink(chat.id),
         });
 
-        console.log(
-          `[chat_member] assinatura ativada: user=${telegramUserId} course=${course.id}`
-        );
+        const untilLabel = toIsoDate(untilDate).split("-").reverse().join("/");
+        try {
+          await ctx.api.sendMessage(
+            telegramUserId,
+            [
+              "✅ *Assinatura confirmada*",
+              "",
+              `Você entrou em *${courseName}*.`,
+              `Acesso até *${untilLabel}*.`,
+              "",
+              "Abra o canal pelo Mini App em *Meus cursos* se precisar do link de novo.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+          );
+        } catch (notifyErr) {
+          console.warn(`[chat_member] não avisou user=${telegramUserId}:`, notifyErr);
+        }
+
+        console.log(`[chat_member] ativada: user=${telegramUserId} course=${course.id}`);
       } else if (becameInactive) {
         await deactivateSubscription({ telegramUserId, courseId: course.id });
+
+        try {
+          await ctx.api.sendMessage(
+            telegramUserId,
+            [
+              "⚠️ *Acesso encerrado*",
+              "",
+              `Você saiu de *${courseName}* ou a assinatura expirou.`,
+              "Para voltar, abra o catálogo e toque em *Assinar*.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+          );
+        } catch (notifyErr) {
+          console.warn(`[chat_member] não avisou saída user=${telegramUserId}:`, notifyErr);
+        }
       }
     } catch (err) {
       console.error("[chat_member] falha ao sincronizar assinatura:", err);

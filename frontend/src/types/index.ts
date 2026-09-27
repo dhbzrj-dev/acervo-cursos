@@ -16,12 +16,13 @@ export interface Course {
   inviteLink: string;
   channelId: string;
   isActive: boolean;
+  createdAt?: string;
   studentsCount?: number;
 }
 
 export interface UserSubscription {
   courseId: string;
   active: boolean;
-  renewsAt: string; // ISO date
-  channelDeepLink: string; // link direto para abrir o canal (t.me/c/...)
+  renewsAt: string;
+  channelDeepLink: string;
 }

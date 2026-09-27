@@ -68,3 +68,29 @@ export async function deactivateSubscription(
     [telegramUserId, courseId]
   );
 }
+export async function listSubscriptionsDueInDays(days: number) {
+  const { rows } = await pool.query(
+    `SELECT s.telegram_user_id, s.course_id, s.renews_at, c.name AS course_name
+     FROM user_subscriptions s
+     JOIN courses c ON c.id = s.course_id
+     WHERE s.active = TRUE
+       AND s.renews_at = (CURRENT_DATE + $1::int)
+       AND (s.renewal_reminder_sent_on IS NULL OR s.renewal_reminder_sent_on <> CURRENT_DATE)`,
+    [days]
+  );
+  return rows as {
+    telegram_user_id: number;
+    course_id: string;
+    renews_at: string;
+    course_name: string;
+  }[];
+}
+
+export async function markRenewalReminderSent(telegramUserId: number, courseId: string) {
+  await pool.query(
+    `UPDATE user_subscriptions
+     SET renewal_reminder_sent_on = CURRENT_DATE
+     WHERE telegram_user_id = $1 AND course_id = $2`,
+    [telegramUserId, courseId]
+  );
+}

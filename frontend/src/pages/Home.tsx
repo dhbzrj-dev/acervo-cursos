@@ -7,11 +7,15 @@ import EmptyState from "@/components/EmptyState";
 import { fetchCategories, fetchCourses, fetchMySubscriptions } from "@/lib/api";
 import type { Category, Course, UserSubscription } from "@/types";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
+import { useFavorites } from "@/hooks/useFavorites";
 
 const ALL_CATEGORY_ID = "all";
+type AccessFilter = "all" | "subscribed" | "available" | "favorites";
+type PriceFilter = "all" | "low" | "mid" | "high";
 
 export default function Home() {
   useTelegramBackButton(false);
+  const favorites = useFavorites();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -19,6 +23,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState(ALL_CATEGORY_ID);
   const [query, setQuery] = useState("");
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,26 +51,78 @@ export default function Home() {
   }, []);
 
   const subscribedIds = useMemo(
-    () => new Set(subscriptions.map((s) => s.courseId)),
+    () => new Set(subscriptions.filter((s) => s.active).map((s) => s.courseId)),
     [subscriptions]
   );
 
+  const topId = useMemo(() => {
+    let best: Course | null = null;
+    for (const course of courses) {
+      const n = course.studentsCount ?? 0;
+      if (n > 0 && (!best || n > (best.studentsCount ?? 0))) best = course;
+    }
+    return best?.id ?? null;
+  }, [courses]);
+
+  function badgeFor(course: Course): "novo" | "top" | null {
+    if (course.id === topId) return "top";
+    if (!course.createdAt) return null;
+    const age = Date.now() - new Date(course.createdAt).getTime();
+    return age < 14 * 24 * 60 * 60 * 1000 ? "novo" : null;
+  }
+
+  const filterCount =
+    (accessFilter === "all" ? 0 : 1) + (priceFilter === "all" ? 0 : 1);
+
   const filteredCourses = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const categoryNameById = new Map(
+      categories.map((c) => [c.id, c.name.toLowerCase()])
+    );
+
     return courses.filter((course) => {
       const matchesCategory =
         activeCategory === ALL_CATEGORY_ID || course.categoryId === activeCategory;
-      const matchesQuery = course.name
-        .toLowerCase()
-        .includes(query.trim().toLowerCase());
-      return matchesCategory && matchesQuery;
+
+      const isSub = subscribedIds.has(course.id);
+      const matchesAccess =
+        accessFilter === "all" ||
+        (accessFilter === "subscribed" && isSub) ||
+        (accessFilter === "available" && !isSub) ||
+        (accessFilter === "favorites" && favorites.has(course.id));
+
+      const price = course.priceStars ?? 0;
+      const matchesPrice =
+        priceFilter === "all" ||
+        (priceFilter === "low" && price <= 500) ||
+        (priceFilter === "mid" && price > 500 && price <= 1000) ||
+        (priceFilter === "high" && price > 1000);
+
+      if (!matchesCategory || !matchesAccess || !matchesPrice) return false;
+      if (!q) return true;
+
+      const haystack = [
+        course.name,
+        course.description,
+        categoryNameById.get(course.categoryId) ?? "",
+        Array.isArray(course.benefits) ? course.benefits.join(" ") : "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
     });
-  }, [courses, activeCategory, query]);
+  }, [courses, categories, activeCategory, query, accessFilter, priceFilter, subscribedIds, favorites.ids]);
 
   return (
     <div className="pb-24">
-      <Header query={query} onQueryChange={setQuery} />
+      <Header
+        query={query}
+        onQueryChange={setQuery}
+        onOpenFilters={() => setFiltersOpen(true)}
+        filterCount={filterCount}
+      />
 
-      {/* Pills de categoria */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-1">
         <CategoryPill
           category={{ id: ALL_CATEGORY_ID, name: "Todos", emoji: "✨", order: 0 }}
@@ -80,7 +139,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Grid de cursos */}
       <div className="mt-4 px-4">
         {loading ? (
           <div className="grid grid-cols-2 gap-3">
@@ -92,7 +150,7 @@ export default function Home() {
           <EmptyState
             emoji="🔍"
             title="Nenhum curso encontrado"
-            description="Tente buscar por outro termo ou escolher outra categoria."
+            description="Tente buscar por outro termo ou escolher outro filtro."
           />
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -101,11 +159,72 @@ export default function Home() {
                 key={course.id}
                 course={course}
                 isSubscribed={subscribedIds.has(course.id)}
+                isFavorite={favorites.has(course.id)}
+                onToggleFavorite={favorites.toggle}
+                badge={badgeFor(course)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {filtersOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setFiltersOpen(false)}>
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl bg-bg p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-3 text-lg font-semibold">Filtros</h2>
+            <p className="mb-2 text-sm text-muted">Acesso</p>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                ["all", "Todos"],
+                ["subscribed", "Já assinei"],
+                ["available", "Não assinei"],
+                ["favorites", "Favoritos"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setAccessFilter(id as AccessFilter)}
+                  className={`rounded-full px-3 py-1.5 text-sm ${
+                    accessFilter === id ? "bg-white text-black" : "bg-white/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 text-sm text-muted">Preço</p>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                ["all", "Qualquer"],
+                ["low", "Até 500 ★"],
+                ["mid", "500–1000 ★"],
+                ["high", "1000+ ★"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPriceFilter(id as PriceFilter)}
+                  className={`rounded-full px-3 py-1.5 text-sm ${
+                    priceFilter === id ? "bg-white text-black" : "bg-white/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-white p-3 font-semibold text-black"
+              onClick={() => setFiltersOpen(false)}
+            >
+              Ver resultados
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

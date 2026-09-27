@@ -11,9 +11,10 @@ export interface CourseRow {
   inviteLink: string;
   channelId: string;
   isActive: boolean;
+  createdAt: string;
+  studentsCount: number;
 }
 
-// Mapeia snake_case (Postgres) -> camelCase (contrato da API/frontend).
 function mapRow(row: any): CourseRow {
   return {
     id: row.id,
@@ -26,27 +27,27 @@ function mapRow(row: any): CourseRow {
     inviteLink: row.invite_link,
     channelId: row.channel_id,
     isActive: row.is_active,
+    createdAt: row.created_at,
+    studentsCount: Number(row.students_count ?? 0),
   };
 }
 
+const SELECT = `
+  SELECT c.id, c.category_id, c.name, c.description, c.benefits, c.cover_url,
+         c.price_stars, c.invite_link, c.channel_id, c.is_active, c.created_at,
+         (SELECT COUNT(*)::int FROM user_subscriptions s
+          WHERE s.course_id = c.id AND s.active = TRUE) AS students_count
+  FROM courses c
+`;
+
 export async function listActiveCourses(): Promise<CourseRow[]> {
   const { rows } = await pool.query(
-    `SELECT id, category_id, name, description, benefits, cover_url,
-            price_stars, invite_link, channel_id, is_active
-     FROM courses
-     WHERE is_active = TRUE
-     ORDER BY created_at DESC`
+    `${SELECT} WHERE c.is_active = TRUE ORDER BY c.created_at DESC`
   );
   return rows.map(mapRow);
 }
 
 export async function findCourseById(id: string): Promise<CourseRow | null> {
-  const { rows } = await pool.query(
-    `SELECT id, category_id, name, description, benefits, cover_url,
-            price_stars, invite_link, channel_id, is_active
-     FROM courses
-     WHERE id = $1`,
-    [id]
-  );
+  const { rows } = await pool.query(`${SELECT} WHERE c.id = $1`, [id]);
   return rows[0] ? mapRow(rows[0]) : null;
 }

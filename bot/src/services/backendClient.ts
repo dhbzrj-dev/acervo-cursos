@@ -1,11 +1,5 @@
 import { env } from "../config/env.js";
 
-/**
- * Cliente fino para as rotas internas do backend (`/internal/*`).
- * Autentica via header `x-internal-key`, o mesmo `INTERNAL_API_KEY`
- * configurado dos dois lados.
- */
-
 async function callInternalApi(path: string, body: unknown): Promise<void> {
   const res = await fetch(`${env.backendUrl}${path}`, {
     method: "POST",
@@ -25,7 +19,7 @@ async function callInternalApi(path: string, body: unknown): Promise<void> {
 export function upsertSubscription(params: {
   telegramUserId: number;
   courseId: string;
-  renewsAt: string; // YYYY-MM-DD
+  renewsAt: string;
   channelDeepLink: string;
 }): Promise<void> {
   return callInternalApi("/internal/subscriptions", params);
@@ -36,4 +30,30 @@ export function deactivateSubscription(params: {
   courseId: string;
 }): Promise<void> {
   return callInternalApi("/internal/subscriptions/deactivate", params);
+}
+
+export async function listDueSoon(days = 3) {
+  const res = await fetch(
+    `${env.backendUrl}/internal/subscriptions/due-soon?days=${days}`,
+    { headers: { "x-internal-key": env.internalApiKey } }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Falha ao listar vencimentos: ${res.status} ${text}`);
+  }
+  return res.json() as Promise<
+    {
+      telegram_user_id: number;
+      course_id: string;
+      renews_at: string;
+      course_name: string;
+    }[]
+  >;
+}
+
+export function markReminderSent(telegramUserId: number, courseId: string) {
+  return callInternalApi("/internal/subscriptions/reminder-sent", {
+    telegramUserId,
+    courseId,
+  });
 }
