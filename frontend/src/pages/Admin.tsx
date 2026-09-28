@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import CoverCropper from "@/components/CoverCropper";
 
 type Category = { id: string; name: string; emoji?: string; order?: number };
 type Course = {
@@ -218,12 +219,10 @@ export default function Admin() {
             value={form.benefits}
             onChange={(e) => setForm({ ...form, benefits: e.target.value })}
           />
-          <input
-            className="rounded-xl bg-white/10 p-3"
-            placeholder="URL da capa"
-            value={form.cover_url}
-            onChange={(e) => setForm({ ...form, cover_url: e.target.value })}
-          />
+          <CoverCropper onDone={(url) => setForm({ ...form, cover_url: url })} />
+          {form.cover_url && (
+            <img src={form.cover_url} alt="" className="h-28 w-full rounded-xl object-cover" />
+          )}
           <input
             className="rounded-xl bg-white/10 p-3"
             type="number"
