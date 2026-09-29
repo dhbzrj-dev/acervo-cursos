@@ -12,6 +12,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 const ALL_CATEGORY_ID = "all";
 type AccessFilter = "all" | "subscribed" | "available" | "favorites";
 type PriceFilter = "all" | "low" | "mid" | "high";
+type SortMode = "default" | "newest" | "price";
 
 export default function Home() {
   useTelegramBackButton(false);
@@ -25,6 +26,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("default");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
@@ -72,7 +74,9 @@ export default function Home() {
   }
 
   const filterCount =
-    (accessFilter === "all" ? 0 : 1) + (priceFilter === "all" ? 0 : 1);
+    (accessFilter === "all" ? 0 : 1) +
+    (priceFilter === "all" ? 0 : 1) +
+    (sortMode === "default" ? 0 : 1);
 
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -80,7 +84,7 @@ export default function Home() {
       categories.map((c) => [c.id, c.name.toLowerCase()])
     );
 
-    return courses.filter((course) => {
+    const list = courses.filter((course) => {
       const matchesCategory =
         activeCategory === ALL_CATEGORY_ID || course.categoryId === activeCategory;
 
@@ -112,7 +116,28 @@ export default function Home() {
 
       return haystack.includes(q);
     });
-  }, [courses, categories, activeCategory, query, accessFilter, priceFilter, subscribedIds, favorites.ids]);
+
+    const sorted = [...list];
+    if (sortMode === "newest") {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      );
+    } else if (sortMode === "price") {
+      sorted.sort((a, b) => (a.priceStars ?? 0) - (b.priceStars ?? 0));
+    }
+    return sorted;
+  }, [
+    courses,
+    categories,
+    activeCategory,
+    query,
+    accessFilter,
+    priceFilter,
+    sortMode,
+    subscribedIds,
+    favorites.ids,
+  ]);
 
   return (
     <div className="pb-24">
@@ -209,6 +234,25 @@ export default function Home() {
                   onClick={() => setPriceFilter(id as PriceFilter)}
                   className={`rounded-full px-3 py-1.5 text-sm ${
                     priceFilter === id ? "bg-white text-black" : "bg-white/10"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 text-sm text-muted">Ordem</p>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                ["default", "Padrão"],
+                ["newest", "Mais novos"],
+                ["price", "Menor preço"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSortMode(id as SortMode)}
+                  className={`rounded-full px-3 py-1.5 text-sm ${
+                    sortMode === id ? "bg-white text-black" : "bg-white/10"
                   }`}
                 >
                   {label}
