@@ -2,19 +2,30 @@ import { useTelegramBackButton, useTelegramUser } from "@/hooks/useTelegram";
 import { fetchMySubscriptions } from "@/lib/api";
 import { useEffect, useState } from "react";
 
+const SUPPORT_URL = "https://t.me/Olimpocursosreal";
+
 export default function Profile() {
   useTelegramBackButton(false);
   const tgUser = useTelegramUser();
   const [activeCount, setActiveCount] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchMySubscriptions().then((subs) => setActiveCount(subs.length));
+    fetchMySubscriptions().then((subs) =>
+      setActiveCount(subs.filter((s) => s.active).length)
+    );
   }, []);
 
   const displayName = tgUser
     ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
     : "Visitante";
   const initials = displayName.trim().charAt(0).toUpperCase() || "?";
+
+  function openSupport() {
+    const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } })
+      .Telegram?.WebApp;
+    if (tg?.openTelegramLink) tg.openTelegramLink(SUPPORT_URL);
+    else window.open(SUPPORT_URL, "_blank");
+  }
 
   return (
     <div className="min-h-screen pb-24">
@@ -52,7 +63,7 @@ export default function Profile() {
 
         <div className="mt-3 flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
           <ProfileLink label="Histórico de pagamentos" />
-          <ProfileLink label="Suporte" />
+          <ProfileLink label="Suporte" onClick={openSupport} />
           <ProfileLink label="Termos e privacidade" />
         </div>
       </div>
@@ -60,9 +71,13 @@ export default function Profile() {
   );
 }
 
-function ProfileLink({ label }: { label: string }) {
+function ProfileLink({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
-    <button className="flex items-center justify-between px-4 py-3.5 text-left active:bg-[#1a1a1a]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-between px-4 py-3.5 text-left active:bg-[#1a1a1a]"
+    >
       <span className="text-[14px] text-ink">{label}</span>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
         <path
