@@ -80,9 +80,21 @@ export async function adminRoutes(app: FastifyInstance) {
       ? b.benefits
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     await pool.query(
-      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [id, b.category_id, b.name, b.description || "", benefits, b.cover_url || "", Number(b.price_stars || 0), b.invite_link || "", b.channel_id || "", b.is_active !== false]
+      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        id,
+        b.category_id,
+        b.name,
+        b.description || "",
+        benefits,
+        b.cover_url || "",
+        Number(b.price_stars || 0),
+        b.invite_link || "",
+        b.channel_id || "",
+        b.is_active !== false,
+        b.preview_url || "",
+      ]
     );
     return { ok: true, id };
   });
@@ -94,8 +106,20 @@ export async function adminRoutes(app: FastifyInstance) {
       ? b.benefits
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     await pool.query(
-      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9 WHERE id=$10`,
-      [b.category_id, b.name, b.description || "", benefits, b.cover_url || "", Number(b.price_stars || 0), b.invite_link || "", b.channel_id || "", b.is_active !== false, request.params.id]
+      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10 WHERE id=$11`,
+      [
+        b.category_id,
+        b.name,
+        b.description || "",
+        benefits,
+        b.cover_url || "",
+        Number(b.price_stars || 0),
+        b.invite_link || "",
+        b.channel_id || "",
+        b.is_active !== false,
+        b.preview_url || "",
+        request.params.id,
+      ]
     );
     return { ok: true };
   });
