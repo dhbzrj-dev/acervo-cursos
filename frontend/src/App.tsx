@@ -1,4 +1,5 @@
-import { Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import Home from "@/pages/Home";
 import CoursePage from "@/pages/CoursePage";
@@ -9,9 +10,19 @@ import Admin from "@/pages/Admin";
 
 export default function App() {
   const location = useLocation();
+  const telegramStoleHash =
+    location.pathname.includes("tgWebApp") || location.hash.includes("tgWebAppData");
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   const hideBottomNav =
-    location.pathname.startsWith("/curso/") ||
-    location.pathname.startsWith("/admin");
+    location.pathname.startsWith("/curso/") || location.pathname.startsWith("/admin");
+
+  if (telegramStoleHash) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-bg text-ink">
