@@ -65,6 +65,7 @@ export type ChatMessage = {
   nickname: string;
   avatar: string;
   mine: boolean;
+  reply?: { id: number; nickname: string; body: string } | null;
 };
 
 export type ChatSnapshot = {
@@ -77,8 +78,11 @@ export async function fetchChat(after = 0): Promise<ChatSnapshot> {
   return apiGet<ChatSnapshot>(`/chat/messages?after=${after}`, { auth: true });
 }
 
-export async function sendChat(body: string): Promise<{ ok: boolean; id: number }> {
-  return apiSend("/chat/messages", { body });
+export async function sendChat(
+  body: string,
+  replyTo?: number | null
+): Promise<{ ok: boolean; id: number }> {
+  return apiSend("/chat/messages", { body, replyTo: replyTo || undefined });
 }
 
 export async function fetchCategories(): Promise<Category[]> {

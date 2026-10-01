@@ -15,6 +15,7 @@ export default function Sala() {
   const [me, setMe] = useState("…");
   const [banned, setBanned] = useState(false);
   const [draft, setDraft] = useState("");
+  const [reply, setReply] = useState<ChatMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
@@ -64,10 +65,12 @@ export default function Sala() {
     e.preventDefault();
     const text = draft.trim();
     if (!text || banned) return;
+    const replyId = reply?.id ?? null;
     setDraft("");
+    setReply(null);
     setEmojiOpen(false);
     try {
-      await sendChat(text);
+      await sendChat(text, replyId);
       const data = await fetchChat(lastId.current);
       setMessages((current) => {
         const map = new Map(current.map((item) => [item.id, item]));
@@ -82,7 +85,7 @@ export default function Sala() {
   }
 
   return (
-    <div className="min-h-screen pb-36">
+    <div className="min-h-screen pb-44">
       <header className="sticky top-0 z-10 bg-bg/95 px-4 pb-3 pt-[max(1rem,var(--tg-safe-top))] backdrop-blur">
         <h1 className="text-[22px] font-bold tracking-tight text-ink">Sala</h1>
         <p className="mt-1 text-[13px] leading-snug text-muted">
@@ -97,22 +100,38 @@ export default function Sala() {
         <p className="px-4 text-[14px] text-muted">Abrindo a sala…</p>
       ) : (
         <ul className="flex flex-col gap-3 px-4">
-          {messages.length === 0 && <li className="text-[14px] text-muted">Ninguém falou ainda. Manda a primeira.</li>}
+          {messages.length === 0 && (
+            <li className="text-[14px] text-muted">Ninguém falou ainda. Manda a primeira.</li>
+          )}
           {messages.map((msg) => (
             <li key={msg.id} className={msg.mine ? "flex justify-end" : "flex"}>
               <div className="max-w-[78%]">
                 <p className={`mb-1 text-[12px] text-muted ${msg.mine ? "text-right" : ""}`}>
                   {msg.mine ? `Você · ${msg.nickname}` : msg.nickname}
                 </p>
-                <p
+                <div
                   className={
                     msg.mine
                       ? "rounded-2xl rounded-br-md bg-ink px-3 py-2 text-[14px] leading-relaxed text-bg"
                       : "rounded-2xl rounded-bl-md border border-border bg-surface px-3 py-2 text-[14px] leading-relaxed text-ink"
                   }
                 >
-                  {msg.body}
-                </p>
+                  {msg.reply && (
+                    <p className="mb-1 line-clamp-2 border-l-2 border-current/40 pl-2 text-[12px] opacity-80">
+                      {msg.reply.nickname}: {msg.reply.body}
+                    </p>
+                  )}
+                  <p>{msg.body}</p>
+                </div>
+                {!banned && (
+                  <button
+                    type="button"
+                    onClick={() => setReply(msg)}
+                    className={`mt-1 text-[11px] text-muted ${msg.mine ? "block w-full text-right" : ""}`}
+                  >
+                    Responder
+                  </button>
+                )}
               </div>
             </li>
           ))}
@@ -128,8 +147,19 @@ export default function Sala() {
           className="fixed inset-x-0 z-20 border-t border-border bg-bg/95 px-3 py-2 backdrop-blur"
           style={{ bottom: "calc(4.25rem + var(--tg-safe-bottom, 0px))" }}
         >
+          {reply && (
+            <div className="mx-auto mb-2 flex max-w-md items-start justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2">
+              <p className="min-w-0 text-[12px] text-muted">
+                <span className="block font-semibold text-ink">Respondendo a {reply.nickname}</span>
+                <span className="line-clamp-1">{reply.body}</span>
+              </p>
+              <button type="button" onClick={() => setReply(null)} className="shrink-0 text-[12px] text-ink">
+                Cancelar
+              </button>
+            </div>
+          )}
           {emojiOpen && (
-            <div className="mb-2 grid grid-cols-8 gap-1 rounded-card border border-border bg-surface p-2">
+            <div className="mx-auto mb-2 grid max-w-md grid-cols-8 gap-1 rounded-card border border-border bg-surface p-2">
               {EMOJIS.map((emoji) => (
                 <button
                   key={emoji}

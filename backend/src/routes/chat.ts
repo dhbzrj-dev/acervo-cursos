@@ -73,9 +73,12 @@ export async function chatRoutes(app: FastifyInstance) {
     const after = Number((request.query as { after?: string }).after || 0);
 
     const { rows } = await pool.query(
-      `SELECT m.id, m.body, m.created_at, m.telegram_user_id, a.nickname, a.avatar
+      `SELECT m.id, m.body, m.created_at, m.telegram_user_id, a.nickname, a.avatar,
+              m.reply_to_id, p.body AS reply_body, pa.nickname AS reply_nickname
        FROM chat_messages m
        JOIN chat_aliases a ON a.telegram_user_id = m.telegram_user_id
+       LEFT JOIN chat_messages p ON p.id = m.reply_to_id
+       LEFT JOIN chat_aliases pa ON pa.telegram_user_id = p.telegram_user_id
        WHERE NOT EXISTS (
          SELECT 1 FROM chat_bans b WHERE b.telegram_user_id = m.telegram_user_id
        )
@@ -92,6 +95,13 @@ export async function chatRoutes(app: FastifyInstance) {
       nickname: row.nickname as string,
       avatar: row.avatar as string,
       mine: Number(row.telegram_user_id) === userId,
+      reply: row.reply_to_id
+        ? {
+            id: Number(row.reply_to_id),
+            nickname: (row.reply_nickname as string) || "Alguém",
+            body: (row.reply_body as string) || "",
+          }
+        : null,
     }));
 
     return { me, banned: await isBanned(userId), messages };
@@ -103,7 +113,8 @@ export async function chatRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "Você não pode escrever na sala." });
     }
 
-    const body = cleanBody((request.body as { body?: string })?.body);
+    const payload = (request.body || {}) as { body?: string; replyTo?: number };
+    const body = cleanBody(payload.body);
     if (!body) return reply.code(400).send({ error: "Mensagem vazia." });
 
     await ensureAlias(userId);
@@ -119,11 +130,18 @@ export async function chatRoutes(app: FastifyInstance) {
       if (delta < 1500) return reply.code(429).send({ error: "Espere um instante." });
     }
 
+    let replyTo: number | null = null;
+    const wanted = Number(payload.replyTo || 0);
+    if (wanted) {
+      const parent = await pool.query("SELECT id FROM chat_messages WHERE id = $1", [wanted]);
+      if (parent.rows[0]) replyTo = wanted;
+    }
+
     const inserted = await pool.query(
-      `INSERT INTO chat_messages (telegram_user_id, body)
-       VALUES ($1, $2)
+      `INSERT INTO chat_messages (telegram_user_id, body, reply_to_id)
+       VALUES ($1, $2, $3)
        RETURNING id`,
-      [userId, body]
+      [userId, body, replyTo]
     );
     return { ok: true, id: Number(inserted.rows[0].id) };
   });
