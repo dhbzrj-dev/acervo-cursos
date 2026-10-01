@@ -40,6 +40,47 @@ async function apiGet<T>(path: string, opts?: { auth?: boolean }): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function apiSend<T>(path: string, body: unknown): Promise<T> {
+  const initData = getInitDataRaw();
+  if (!initData) {
+    throw new Error("Sem initData do Telegram — não é possível autenticar.");
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `tma ${initData}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error || `POST ${path} falhou: ${res.status}`);
+  return data as T;
+}
+
+export type ChatMessage = {
+  id: number;
+  body: string;
+  createdAt: string;
+  nickname: string;
+  avatar: string;
+  mine: boolean;
+};
+
+export type ChatSnapshot = {
+  me: { nickname: string; avatar: string };
+  banned: boolean;
+  messages: ChatMessage[];
+};
+
+export async function fetchChat(after = 0): Promise<ChatSnapshot> {
+  return apiGet<ChatSnapshot>(`/chat/messages?after=${after}`, { auth: true });
+}
+
+export async function sendChat(body: string): Promise<{ ok: boolean; id: number }> {
+  return apiSend("/chat/messages", { body });
+}
+
 export async function fetchCategories(): Promise<Category[]> {
   if (USE_MOCKS) {
     await delay(FAKE_LATENCY_MS);

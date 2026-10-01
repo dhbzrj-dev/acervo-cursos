@@ -8,7 +8,7 @@ import { NavLink } from "react-router-dom";
 
 const items = [
   { to: "/", label: "Home", icon: HomeIcon },
-  { to: "/categorias", label: "Categorias", icon: GridIcon },
+  { to: "/sala", label: "Sala", icon: ChatIcon },
   { to: "/meus-cursos", label: "Meus cursos", icon: BookIcon },
   { to: "/perfil", label: "Perfil", icon: UserIcon },
 ];
@@ -87,6 +87,20 @@ function BookIcon({ active }: IconProps) {
         strokeLinejoin="round"
       />
       <path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H19" stroke={strokeOf(active)} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChatIcon({ active }: IconProps) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M6 17.5 4 20v-6.5A8 8 0 1 1 12 20H8"
+        stroke={strokeOf(active)}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
