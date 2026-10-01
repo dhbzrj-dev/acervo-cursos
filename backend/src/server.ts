@@ -6,9 +6,8 @@ import { coursesRoutes } from "./routes/courses.js";
 import { meRoutes } from "./routes/me.js";
 import { internalRoutes } from "./routes/internal.js";
 import { adminRoutes } from "./routes/admin.js";
-import { closePool, pool } from "./db/pool.js";
-import { adminRoutes } from "./routes/admin.js";
 import { chatRoutes } from "./routes/chat.js";
+import { closePool, pool } from "./db/pool.js";
 
 const app = Fastify({
   logger: {
@@ -16,14 +15,10 @@ const app = Fastify({
   },
 });
 
-// CORS: só o(s) domínio(s) do Mini App (Vercel) e o dev local podem chamar
-// a API a partir do navegador/WebView.
 await app.register(cors, {
   origin: env.frontendOrigins.length > 0 ? env.frontendOrigins : true,
 });
 
-// Rotas públicas — o catálogo em si não exige autenticação, só as
-// assinaturas do usuário (/me/*) e as rotas internas do bot (/internal/*).
 await app.register(categoriesRoutes);
 await app.register(coursesRoutes);
 await app.register(meRoutes);
@@ -32,7 +27,6 @@ await app.register(adminRoutes);
 await app.register(chatRoutes);
 
 app.get("/health", async () => {
-  // Ping simples no banco — falha rápido se a DATABASE_URL estiver errada.
   await pool.query("SELECT 1");
   return { status: "ok" };
 });
@@ -47,8 +41,6 @@ async function start() {
   }
 }
 
-// Encerramento gracioso — importante em hosts como Fly.io/Railway, que
-// enviam SIGTERM antes de matar o processo em deploys/reinícios.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, async () => {
     app.log.info(`Recebido ${signal}, encerrando...`);
