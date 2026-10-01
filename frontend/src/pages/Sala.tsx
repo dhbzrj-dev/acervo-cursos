@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { fetchChat, sendChat, type ChatMessage } from "@/lib/api";
 import { isInsideTelegram } from "@/lib/telegram";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 
 const EMOJIS = ["😀", "😂", "🔥", "❤️", "👍", "👏", "😮", "😢", "✨", "🎉", "👀", "💀", "🤝", "📚", "⭐", "✅"];
+
+function lastIdOf(messages: ChatMessage[]) {
+  return messages.length ? messages[messages.length - 1].id : 0;
+}
 
 export default function Sala() {
   useTelegramBackButton(false);
@@ -34,7 +38,7 @@ export default function Sala() {
         for (const item of data.messages) map.set(item.id, item);
         return [...map.values()].sort((a, b) => a.id - b.id);
       });
-      const newest = data.messages.at(-1)?.id ?? 0;
+      const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
     }
 
@@ -56,7 +60,7 @@ export default function Sala() {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
     if (!text || banned) return;
@@ -70,7 +74,7 @@ export default function Sala() {
         for (const item of data.messages) map.set(item.id, item);
         return [...map.values()].sort((a, b) => a.id - b.id);
       });
-      const newest = data.messages.at(-1)?.id ?? 0;
+      const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não enviou.");
