@@ -13,6 +13,7 @@ type Course = {
   invite_link?: string;
   channel_id?: string;
   is_active?: boolean;
+  preview_url?: string;
 };
 
 export default function Admin() {
@@ -34,6 +35,7 @@ export default function Admin() {
     invite_link: "",
     channel_id: "",
     is_active: true,
+    preview_url: "",
   });
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${password}` };
 
@@ -88,6 +90,7 @@ export default function Admin() {
       invite_link: course.invite_link || "",
       channel_id: course.channel_id || "",
       is_active: course.is_active !== false,
+      preview_url: course.preview_url || "",
     });
   }
 
@@ -223,6 +226,12 @@ export default function Admin() {
           {form.cover_url && (
             <img src={form.cover_url} alt="" className="h-28 w-full rounded-xl object-cover" />
           )}
+          <input
+            className="rounded-xl bg-white/10 p-3"
+            placeholder="Vídeo de amostra .mp4"
+            value={form.preview_url}
+            onChange={(e) => setForm({ ...form, preview_url: e.target.value })}
+          />
           <input
             className="rounded-xl bg-white/10 p-3"
             type="number"

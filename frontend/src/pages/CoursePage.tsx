@@ -1,3 +1,4 @@
+import PreviewPlayer from "@/components/PreviewPlayer";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { fetchCourseById, fetchMySubscriptions, formatStars, formatRenewalDate } from "@/lib/api";
@@ -51,9 +52,6 @@ export default function CoursePage() {
   const handleCta = () => {
     hapticImpact("medium");
     setRedirecting(true);
-    // O Telegram assume o fluxo de cobrança/entrada; não há callback de
-    // sucesso síncrono aqui — a confirmação chega via bot (chat_join_request
-    // ou successful_payment) e atualiza `user_subscriptions` no backend.
     openInviteLink(isSubscribed ? subscription!.channelDeepLink : course.inviteLink);
     hapticNotification("success");
     window.setTimeout(() => setRedirecting(false), 1200);
@@ -61,7 +59,6 @@ export default function CoursePage() {
 
   return (
     <div className="pb-32">
-      {/* Capa grande */}
       <div className="aspect-[16/10] w-full bg-[#1a1a1a]">
         <img
           src={course.coverUrl}
@@ -75,7 +72,6 @@ export default function CoursePage() {
           {course.name}
         </h1>
 
-        {/* Preço em destaque */}
         <p className="mt-2 text-[26px] font-extrabold text-ink">
           {formatStars(course.priceStars)} ★
           <span className="ml-1.5 text-[15px] font-medium text-muted">/ mês</span>
@@ -93,12 +89,12 @@ export default function CoursePage() {
           </p>
         )}
 
-        {/* Descrição curta */}
         <p className="mt-4 text-[15px] leading-relaxed text-ink/90">
           {course.description}
         </p>
 
-        {/* Benefícios */}
+        {!isSubscribed && course.previewUrl && <PreviewPlayer src={course.previewUrl} />}
+
         <div className="mt-6">
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">
             O que está incluído
@@ -116,7 +112,6 @@ export default function CoursePage() {
         </div>
       </div>
 
-      {/* Botão sticky */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-bg/95 backdrop-blur px-4 pt-3 pb-[max(0.75rem,var(--tg-safe-bottom))]">
         <button
           onClick={handleCta}
@@ -127,7 +122,7 @@ export default function CoursePage() {
             ? "Abrir canal"
             : redirecting
             ? "Abrindo Telegram…"
-            : `⭐ Assinar por ${formatStars(course.priceStars)} Stars/mês`}
+            : `Assinar por ${formatStars(course.priceStars)} Stars/mês`}
         </button>
       </div>
     </div>

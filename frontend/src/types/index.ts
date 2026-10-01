@@ -17,6 +17,7 @@ export interface Course {
   channelId: string;
   isActive: boolean;
   createdAt?: string;
+  previewUrl?: string;
   studentsCount?: number;
 }
 
