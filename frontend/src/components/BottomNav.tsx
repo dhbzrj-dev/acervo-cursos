@@ -66,17 +66,6 @@ function HomeIcon({ active }: IconProps) {
   );
 }
 
-function GridIcon({ active }: IconProps) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <rect x="4" y="4" width="7" height="7" rx="1.5" stroke={strokeOf(active)} strokeWidth="2" />
-      <rect x="13" y="4" width="7" height="7" rx="1.5" stroke={strokeOf(active)} strokeWidth="2" />
-      <rect x="4" y="13" width="7" height="7" rx="1.5" stroke={strokeOf(active)} strokeWidth="2" />
-      <rect x="13" y="13" width="7" height="7" rx="1.5" stroke={strokeOf(active)} strokeWidth="2" />
-    </svg>
-  );
-}
-
 function BookIcon({ active }: IconProps) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
