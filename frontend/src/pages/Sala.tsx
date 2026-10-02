@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type UIEvent } from "react";
 import { fetchChat, sendChat, type ChatMessage } from "@/lib/api";
 import { isInsideTelegram } from "@/lib/telegram";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
@@ -9,9 +9,9 @@ function lastIdOf(messages: ChatMessage[]) {
   return messages.length ? messages[messages.length - 1].id : 0;
 }
 
-function distanceFromBottom() {
-  const root = document.scrollingElement || document.documentElement;
-  return root.scrollHeight - root.scrollTop - window.innerHeight;
+function atEnd(el: HTMLElement | null) {
+  if (!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 }
 
 export default function Sala() {
@@ -25,15 +25,26 @@ export default function Sala() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [unseen, setUnseen] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const lastId = useRef(0);
-  const stickRef = useRef(true);
+  const followRef = useRef(true);
 
-  function stickToLatest() {
-    stickRef.current = true;
-    setUnseen(false);
-    endRef.current?.scrollIntoView({ block: "end" });
+  function scrollToEnd() {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }
+
+  function onListScroll(event: UIEvent<HTMLDivElement>) {
+    const following = atEnd(event.currentTarget);
+    followRef.current = following;
+    if (following) setUnseen(false);
+  }
+
+  useEffect(() => {
+    if (!followRef.current) return;
+    scrollToEnd();
+  }, [messages]);
 
   useEffect(() => {
     if (!isInsideTelegram()) {
@@ -48,7 +59,8 @@ export default function Sala() {
       setMe(data.me.nickname);
       setBanned(data.banned);
 
-      const stay = stickRef.current || distanceFromBottom() < 160;
+      const follow = atEnd(scrollerRef.current);
+      followRef.current = follow;
       setMessages((current) => {
         const map = new Map(current.map((item) => [item.id, item]));
         let added = false;
@@ -56,17 +68,13 @@ export default function Sala() {
           if (!map.has(item.id)) added = true;
           map.set(item.id, item);
         }
-        if (!added && data.messages.length === 0) return current;
         if (!added && after > 0) return current;
-        if (added && !stay) setUnseen(true);
+        if (added && !follow) setUnseen(true);
         return [...map.values()].sort((a, b) => a.id - b.id);
       });
 
       const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
-      if (stay) {
-        requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end" }));
-      }
     }
 
     load(0)
@@ -77,17 +85,9 @@ export default function Sala() {
       load(lastId.current).catch(() => {});
     }, 4000);
 
-    function onScroll() {
-      const atBottom = distanceFromBottom() < 160;
-      stickRef.current = atBottom;
-      if (atBottom) setUnseen(false);
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-
     return () => {
       stop = true;
       window.clearInterval(timer);
-      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -99,7 +99,7 @@ export default function Sala() {
     setDraft("");
     setReply(null);
     setEmojiOpen(false);
-    stickRef.current = true;
+    followRef.current = true;
     setUnseen(false);
     try {
       await sendChat(text, replyId);
@@ -111,15 +111,14 @@ export default function Sala() {
       });
       const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
-      requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não enviou.");
     }
   }
 
   return (
-    <div className="min-h-screen pb-44">
-      <header className="sticky top-0 z-10 bg-bg/95 px-4 pb-3 pt-[max(1rem,var(--tg-safe-top))] backdrop-blur">
+    <div className="flex h-[100dvh] flex-col pb-[calc(4.25rem+var(--tg-safe-bottom,0px))]">
+      <header className="shrink-0 bg-bg/95 px-4 pb-3 pt-[max(1rem,var(--tg-safe-top))] backdrop-blur">
         <h1 className="text-[22px] font-bold tracking-tight text-ink">Sala</h1>
         <p className="mt-1 text-[13px] leading-snug text-muted">
           Seu nome aqui é aleatório. Ninguém vê seu Telegram.
@@ -129,61 +128,65 @@ export default function Sala() {
 
       {!isInsideTelegram() ? (
         <p className="px-4 text-[14px] text-muted">Abra pelo bot do Telegram para escrever na sala.</p>
-      ) : !ready ? (
-        <p className="px-4 text-[14px] text-muted">Abrindo a sala…</p>
       ) : (
-        <ul className="flex flex-col gap-3 px-4">
-          {messages.length === 0 && (
-            <li className="text-[14px] text-muted">Ninguém falou ainda. Manda a primeira.</li>
-          )}
-          {messages.map((msg) => (
-            <li key={msg.id} className={msg.mine ? "flex justify-end" : "flex"}>
-              <div className="max-w-[78%]">
-                <p className={`mb-1 text-[12px] text-muted ${msg.mine ? "text-right" : ""}`}>
-                  {msg.mine ? `Você · ${msg.nickname}` : msg.nickname}
-                </p>
-                <div
-                  className={
-                    msg.mine
-                      ? "rounded-2xl rounded-br-md bg-ink px-3 py-2 text-[14px] leading-relaxed text-bg"
-                      : "rounded-2xl rounded-bl-md border border-border bg-surface px-3 py-2 text-[14px] leading-relaxed text-ink"
-                  }
-                >
-                  {msg.reply && (
-                    <p className="mb-1 line-clamp-2 border-l-2 border-current/40 pl-2 text-[12px] opacity-80">
-                      {msg.reply.nickname}: {msg.reply.body}
+        <div ref={scrollerRef} onScroll={onListScroll} className="min-h-0 flex-1 overflow-y-auto px-4">
+          {!ready ? (
+            <p className="text-[14px] text-muted">Abrindo a sala…</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {messages.length === 0 && (
+                <li className="text-[14px] text-muted">Ninguém falou ainda. Manda a primeira.</li>
+              )}
+              {messages.map((msg) => (
+                <li key={msg.id} className={msg.mine ? "flex justify-end" : "flex"}>
+                  <div className="max-w-[78%]">
+                    <p className={`mb-1 text-[12px] text-muted ${msg.mine ? "text-right" : ""}`}>
+                      {msg.mine ? `Você · ${msg.nickname}` : msg.nickname}
                     </p>
-                  )}
-                  <p>{msg.body}</p>
-                </div>
-                {!banned && (
-                  <button
-                    type="button"
-                    onClick={() => setReply(msg)}
-                    className={`mt-1 text-[11px] text-muted ${msg.mine ? "block w-full text-right" : ""}`}
-                  >
-                    Responder
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-          <div ref={endRef} />
-        </ul>
+                    <div
+                      className={
+                        msg.mine
+                          ? "rounded-2xl rounded-br-md bg-ink px-3 py-2 text-[14px] leading-relaxed text-bg"
+                          : "rounded-2xl rounded-bl-md border border-border bg-surface px-3 py-2 text-[14px] leading-relaxed text-ink"
+                      }
+                    >
+                      {msg.reply && (
+                        <p className="mb-1 line-clamp-2 border-l-2 border-current/40 pl-2 text-[12px] opacity-80">
+                          {msg.reply.nickname}: {msg.reply.body}
+                        </p>
+                      )}
+                      <p>{msg.body}</p>
+                    </div>
+                    {!banned && (
+                      <button
+                        type="button"
+                        onClick={() => setReply(msg)}
+                        className={`mt-1 text-[11px] text-muted ${msg.mine ? "block w-full text-right" : ""}`}
+                      >
+                        Responder
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+              <div ref={endRef} />
+            </ul>
+          )}
+        </div>
       )}
 
-      {error && <p className="px-4 pt-3 text-[13px] text-red-400">{error}</p>}
+      {error && <p className="px-4 py-2 text-[13px] text-red-400">{error}</p>}
 
       {isInsideTelegram() && (
-        <form
-          onSubmit={submit}
-          className="fixed inset-x-0 z-20 border-t border-border bg-bg/95 px-3 py-2 backdrop-blur"
-          style={{ bottom: "calc(4.25rem + var(--tg-safe-bottom, 0px))" }}
-        >
+        <form onSubmit={submit} className="shrink-0 border-t border-border bg-bg/95 px-3 py-2">
           {unseen && (
             <button
               type="button"
-              onClick={stickToLatest}
+              onClick={() => {
+                followRef.current = true;
+                setUnseen(false);
+                scrollToEnd();
+              }}
               className="mx-auto mb-2 block rounded-full bg-ink px-3 py-1 text-[12px] font-semibold text-bg"
             >
               Novas mensagens
