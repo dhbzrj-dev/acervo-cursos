@@ -11,16 +11,13 @@ import { getInitDataRaw, isInsideTelegram } from "@/lib/telegram";
  * artificial só para os skeletons terem algo a mostrar. As telas nunca
  * precisam saber qual dos dois caminhos está sendo usado.
  */
-
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 const USE_MOCKS = !API_URL;
-
 const FAKE_LATENCY_MS = 400;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function apiGet<T>(path: string, opts?: { auth?: boolean }): Promise<T> {
   const headers: Record<string, string> = {};
-
   if (opts?.auth) {
     // Rotas /me/* exigem o initData assinado pelo Telegram — é isso que o
     // backend usa pra validar o HMAC e saber quem está pedindo.
@@ -32,7 +29,6 @@ async function apiGet<T>(path: string, opts?: { auth?: boolean }): Promise<T> {
     }
     headers.Authorization = `tma ${initData}`;
   }
-
   const res = await fetch(`${API_URL}${path}`, { headers });
   if (!res.ok) {
     throw new Error(`GET ${path} falhou: ${res.status}`);
@@ -69,8 +65,11 @@ export type ChatMessage = {
 };
 
 export type ChatSnapshot = {
-  me: { nickname: string; avatar: string };
+  me: { nickname: string; avatar: string; telegramId?: number };
   banned: boolean;
+  admin?: boolean;
+  bans?: string[];
+  liveIds?: number[];
   messages: ChatMessage[];
 };
 
@@ -83,6 +82,14 @@ export async function sendChat(
   replyTo?: number | null
 ): Promise<{ ok: boolean; id: number }> {
   return apiSend("/chat/messages", { body, replyTo: replyTo || undefined });
+}
+
+export async function moderateChat(body: {
+  action: "ban" | "unban" | "delete";
+  messageId?: number;
+  nickname?: string;
+}): Promise<{ ok: boolean; notice?: string }> {
+  return apiSend("/chat/moderation", body);
 }
 
 export async function fetchCategories(): Promise<Category[]> {
