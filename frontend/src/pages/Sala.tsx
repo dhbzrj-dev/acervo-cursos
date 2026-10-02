@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type UIEvent } from "react";
-import { fetchChat, sendChat, type ChatMessage } from "@/lib/api";
+import { fetchChat, moderateChat, sendChat, type ChatMessage } from "@/lib/api";
 import { isInsideTelegram } from "@/lib/telegram";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 
@@ -14,15 +14,41 @@ function atEnd(el: HTMLElement | null) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 }
 
+function prune(current: ChatMessage[], incoming: ChatMessage[], liveIds: number[] | undefined, after: number) {
+  const map = new Map(current.map((item) => [item.id, item]));
+  let added = false;
+  for (const item of incoming) {
+    if (!map.has(item.id)) added = true;
+    map.set(item.id, item);
+  }
+  let next = [...map.values()];
+  if (liveIds) {
+    if (liveIds.length === 0 && after === 0) next = [];
+    else if (liveIds.length > 0) {
+      const live = new Set(liveIds);
+      const min = Math.min(...liveIds);
+      next = next.filter((item) => item.id < min || live.has(item.id));
+    }
+  }
+  next.sort((a, b) => a.id - b.id);
+  return { next, added, changed: added || next.length !== current.length };
+}
+
 export default function Sala() {
   useTelegramBackButton(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [me, setMe] = useState("…");
+  const [myId, setMyId] = useState(0);
+  const [admin, setAdmin] = useState(false);
+  const [bans, setBans] = useState<string[]>([]);
   const [banned, setBanned] = useState(false);
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState<ChatMessage | null>(null);
+  const [menu, setMenu] = useState<ChatMessage | null>(null);
+  const [bansOpen, setBansOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [ready, setReady] = useState(false);
   const [unseen, setUnseen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +67,24 @@ export default function Sala() {
     if (following) setUnseen(false);
   }
 
+  function applySnapshot(data: Awaited<ReturnType<typeof fetchChat>>, after: number) {
+    setMe(data.me.nickname);
+    setMyId(data.me.telegramId || 0);
+    setAdmin(Boolean(data.admin));
+    setBans(data.bans || []);
+    setBanned(data.banned);
+    const follow = atEnd(scrollerRef.current);
+    followRef.current = follow;
+    setMessages((current) => {
+      const result = prune(current, data.messages, data.liveIds, after);
+      if (!result.changed && after > 0) return current;
+      if (result.added && !follow) setUnseen(true);
+      return result.next;
+    });
+    const newest = Math.max(lastId.current, lastIdOf(data.messages), ...(data.liveIds || [0]));
+    lastId.current = newest;
+  }
+
   useEffect(() => {
     if (!followRef.current) return;
     scrollToEnd();
@@ -56,25 +100,7 @@ export default function Sala() {
     async function load(after: number) {
       const data = await fetchChat(after);
       if (stop) return;
-      setMe(data.me.nickname);
-      setBanned(data.banned);
-
-      const follow = atEnd(scrollerRef.current);
-      followRef.current = follow;
-      setMessages((current) => {
-        const map = new Map(current.map((item) => [item.id, item]));
-        let added = false;
-        for (const item of data.messages) {
-          if (!map.has(item.id)) added = true;
-          map.set(item.id, item);
-        }
-        if (!added && after > 0) return current;
-        if (added && !follow) setUnseen(true);
-        return [...map.values()].sort((a, b) => a.id - b.id);
-      });
-
-      const newest = lastIdOf(data.messages);
-      if (newest > lastId.current) lastId.current = newest;
+      applySnapshot(data, after);
     }
 
     load(0)
@@ -91,6 +117,30 @@ export default function Sala() {
     };
   }, []);
 
+  async function refresh() {
+    const fresh = await fetchChat(0);
+    setMe(fresh.me.nickname);
+    setMyId(fresh.me.telegramId || 0);
+    setAdmin(Boolean(fresh.admin));
+    setBans(fresh.bans || []);
+    setBanned(fresh.banned);
+    setMessages(fresh.messages);
+    lastId.current = Math.max(lastIdOf(fresh.messages), ...(fresh.liveIds || [0]));
+  }
+
+  async function moderate(action: "ban" | "unban" | "delete", messageId?: number, nickname?: string) {
+    try {
+      const result = await moderateChat({ action, messageId, nickname });
+      setNotice(result.notice || "Feito.");
+      setError("");
+      setMenu(null);
+      await refresh();
+    } catch (err) {
+      setMenu(null);
+      setError(err instanceof Error ? err.message : "Não deu.");
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
@@ -104,13 +154,7 @@ export default function Sala() {
     try {
       await sendChat(text, replyId);
       const data = await fetchChat(lastId.current);
-      setMessages((current) => {
-        const map = new Map(current.map((item) => [item.id, item]));
-        for (const item of data.messages) map.set(item.id, item);
-        return [...map.values()].sort((a, b) => a.id - b.id);
-      });
-      const newest = lastIdOf(data.messages);
-      if (newest > lastId.current) lastId.current = newest;
+      applySnapshot(data, lastId.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não enviou.");
     }
@@ -119,7 +163,14 @@ export default function Sala() {
   return (
     <div className="flex h-[100dvh] flex-col pb-[calc(4.25rem+var(--tg-safe-bottom,0px))]">
       <header className="shrink-0 bg-bg/95 px-4 pb-3 pt-[max(1rem,var(--tg-safe-top))] backdrop-blur">
-        <h1 className="text-[22px] font-bold tracking-tight text-ink">Sala</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-[22px] font-bold tracking-tight text-ink">Sala</h1>
+          {admin && (
+            <button type="button" onClick={() => setBansOpen(true)} className="text-[13px] text-muted">
+              Banidos{bans.length ? ` (${bans.length})` : ""}
+            </button>
+          )}
+        </div>
         <p className="mt-1 text-[13px] leading-snug text-muted">
           Seu nome aqui é aleatório. Ninguém vê seu Telegram.
           {me !== "…" ? ` Você é ${me}.` : ""}
@@ -139,7 +190,11 @@ export default function Sala() {
               )}
               {messages.map((msg) => (
                 <li key={msg.id} className={msg.mine ? "flex justify-end" : "flex"}>
-                  <div className="max-w-[78%]">
+                  <button
+                    type="button"
+                    onClick={() => setMenu(msg)}
+                    className={`max-w-[78%] text-left ${msg.mine ? "items-end" : ""}`}
+                  >
                     <p className={`mb-1 text-[12px] text-muted ${msg.mine ? "text-right" : ""}`}>
                       {msg.mine ? `Você · ${msg.nickname}` : msg.nickname}
                     </p>
@@ -157,16 +212,7 @@ export default function Sala() {
                       )}
                       <p>{msg.body}</p>
                     </div>
-                    {!banned && (
-                      <button
-                        type="button"
-                        onClick={() => setReply(msg)}
-                        className={`mt-1 text-[11px] text-muted ${msg.mine ? "block w-full text-right" : ""}`}
-                      >
-                        Responder
-                      </button>
-                    )}
-                  </div>
+                  </button>
                 </li>
               ))}
               <div ref={endRef} />
@@ -179,6 +225,7 @@ export default function Sala() {
 
       {isInsideTelegram() && (
         <form onSubmit={submit} className="shrink-0 border-t border-border bg-bg/95 px-3 py-2">
+          {notice && <p className="mx-auto mb-2 max-w-md text-center text-[12px] text-ink">{notice}</p>}
           {unseen && (
             <button
               type="button"
@@ -246,6 +293,88 @@ export default function Sala() {
             </button>
           </div>
         </form>
+      )}
+
+      {menu && (
+        <div className="fixed inset-0 z-30 flex items-end bg-black/50" onClick={() => setMenu(null)}>
+          <div
+            className="w-full rounded-t-3xl bg-surface px-4 pt-4"
+            style={{ paddingBottom: "calc(5.5rem + var(--tg-safe-bottom, 0px))" }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="mb-1 text-center text-[15px] font-semibold text-ink">{menu.nickname}</p>
+            <p className="mb-4 line-clamp-2 text-center text-[12px] text-muted">{menu.body}</p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReply(menu);
+                  setMenu(null);
+                }}
+                className="rounded-xl bg-white/10 p-3 text-[14px] font-semibold text-ink"
+              >
+                Responder
+              </button>
+              {admin && (
+                <button
+                  type="button"
+                  onClick={() => moderate("delete", menu.id)}
+                  className="rounded-xl bg-white/10 p-3 text-[14px] font-semibold text-red-400"
+                >
+                  Apagar mensagem
+                </button>
+              )}
+              {admin && !menu.mine && (
+                <button
+                  type="button"
+                  onClick={() => moderate("ban", menu.id)}
+                  className="rounded-xl bg-white/10 p-3 text-[14px] font-semibold text-red-400"
+                >
+                  Banir {menu.nickname}
+                </button>
+              )}
+              <button type="button" onClick={() => setMenu(null)} className="p-3 text-[14px] text-muted">
+                Fechar
+              </button>
+            </div>
+            {menu.mine && myId > 0 && (
+              <p className="mt-2 text-center text-[11px] text-muted">Seu ID: {myId}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {bansOpen && (
+        <div className="fixed inset-0 z-30 flex items-end bg-black/50" onClick={() => setBansOpen(false)}>
+          <div
+            className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl bg-surface px-4 pt-4"
+            style={{ paddingBottom: "calc(5.5rem + var(--tg-safe-bottom, 0px))" }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="mb-3 text-center text-[15px] font-semibold text-ink">Banidos</p>
+            {bans.length === 0 ? (
+              <p className="mb-3 text-center text-[13px] text-muted">Ninguém banido.</p>
+            ) : (
+              <ul className="mb-3 flex flex-col gap-2">
+                {bans.map((nickname) => (
+                  <li key={nickname} className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
+                    <span className="text-[14px] text-ink">{nickname}</span>
+                    <button
+                      type="button"
+                      onClick={() => moderate("unban", undefined, nickname)}
+                      className="text-[13px] font-semibold text-ink"
+                    >
+                      Desbanir
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" onClick={() => setBansOpen(false)} className="w-full p-3 text-[14px] text-muted">
+              Fechar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
