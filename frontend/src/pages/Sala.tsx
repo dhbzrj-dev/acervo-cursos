@@ -9,6 +9,11 @@ function lastIdOf(messages: ChatMessage[]) {
   return messages.length ? messages[messages.length - 1].id : 0;
 }
 
+function distanceFromBottom() {
+  const root = document.scrollingElement || document.documentElement;
+  return root.scrollHeight - root.scrollTop - window.innerHeight;
+}
+
 export default function Sala() {
   useTelegramBackButton(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -19,8 +24,16 @@ export default function Sala() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [unseen, setUnseen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const lastId = useRef(0);
+  const stickRef = useRef(true);
+
+  function stickToLatest() {
+    stickRef.current = true;
+    setUnseen(false);
+    endRef.current?.scrollIntoView({ block: "end" });
+  }
 
   useEffect(() => {
     if (!isInsideTelegram()) {
@@ -34,13 +47,26 @@ export default function Sala() {
       if (stop) return;
       setMe(data.me.nickname);
       setBanned(data.banned);
+
+      const stay = stickRef.current || distanceFromBottom() < 160;
       setMessages((current) => {
         const map = new Map(current.map((item) => [item.id, item]));
-        for (const item of data.messages) map.set(item.id, item);
+        let added = false;
+        for (const item of data.messages) {
+          if (!map.has(item.id)) added = true;
+          map.set(item.id, item);
+        }
+        if (!added && data.messages.length === 0) return current;
+        if (!added && after > 0) return current;
+        if (added && !stay) setUnseen(true);
         return [...map.values()].sort((a, b) => a.id - b.id);
       });
+
       const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
+      if (stay) {
+        requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end" }));
+      }
     }
 
     load(0)
@@ -51,15 +77,19 @@ export default function Sala() {
       load(lastId.current).catch(() => {});
     }, 4000);
 
+    function onScroll() {
+      const atBottom = distanceFromBottom() < 160;
+      stickRef.current = atBottom;
+      if (atBottom) setUnseen(false);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+
     return () => {
       stop = true;
       window.clearInterval(timer);
+      window.removeEventListener("scroll", onScroll);
     };
   }, []);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -69,6 +99,8 @@ export default function Sala() {
     setDraft("");
     setReply(null);
     setEmojiOpen(false);
+    stickRef.current = true;
+    setUnseen(false);
     try {
       await sendChat(text, replyId);
       const data = await fetchChat(lastId.current);
@@ -79,6 +111,7 @@ export default function Sala() {
       });
       const newest = lastIdOf(data.messages);
       if (newest > lastId.current) lastId.current = newest;
+      requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não enviou.");
     }
@@ -147,6 +180,15 @@ export default function Sala() {
           className="fixed inset-x-0 z-20 border-t border-border bg-bg/95 px-3 py-2 backdrop-blur"
           style={{ bottom: "calc(4.25rem + var(--tg-safe-bottom, 0px))" }}
         >
+          {unseen && (
+            <button
+              type="button"
+              onClick={stickToLatest}
+              className="mx-auto mb-2 block rounded-full bg-ink px-3 py-1 text-[12px] font-semibold text-bg"
+            >
+              Novas mensagens
+            </button>
+          )}
           {reply && (
             <div className="mx-auto mb-2 flex max-w-md items-start justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2">
               <p className="min-w-0 text-[12px] text-muted">
