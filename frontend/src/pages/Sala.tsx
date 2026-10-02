@@ -51,6 +51,7 @@ export default function Sala() {
   const [notice, setNotice] = useState("");
   const [ready, setReady] = useState(false);
   const [unseen, setUnseen] = useState(false);
+  const [hintOpen, setHintOpen] = useState(() => localStorage.getItem("sala_hint_closed") !== "1");
   const scrollerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const lastId = useRef(0);
@@ -171,10 +172,25 @@ export default function Sala() {
             </button>
           )}
         </div>
-        <p className="mt-1 text-[13px] leading-snug text-muted">
-          Seu nome aqui é aleatório. Ninguém vê seu Telegram.
-          {me !== "…" ? ` Você é ${me}.` : ""}
-        </p>
+        {hintOpen && (
+          <div className="mt-2 flex items-start gap-3 rounded-xl border border-border bg-surface px-3 py-2">
+            <p className="min-w-0 flex-1 text-[13px] leading-snug text-muted">
+              Seu nome aqui é aleatório. Ninguém vê seu Telegram.
+              {me !== "…" ? ` Você é ${me}.` : ""}
+            </p>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={() => {
+                localStorage.setItem("sala_hint_closed", "1");
+                setHintOpen(false);
+              }}
+              className="shrink-0 text-[18px] leading-none text-muted"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </header>
 
       {!isInsideTelegram() ? (
