@@ -17,6 +17,14 @@ function cleanBody(value: unknown): string {
     .slice(0, 500);
 }
 
+function isChatAdmin(userId: number): boolean {
+  const ids = String(process.env.CHAT_ADMIN_IDS || "")
+    .split(/[,\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return ids.includes(String(userId));
+}
+
 async function isBanned(telegramUserId: number): Promise<boolean> {
   const { rows } = await pool.query(
     "SELECT 1 FROM chat_bans WHERE telegram_user_id = $1",
@@ -55,6 +63,48 @@ async function ensureAlias(telegramUserId: number) {
   throw new Error("Não foi possível criar apelido.");
 }
 
+async function aliasByNickname(nickname: string) {
+  const { rows } = await pool.query(
+    `SELECT telegram_user_id, nickname FROM chat_aliases WHERE lower(nickname) = lower($1)`,
+    [nickname]
+  );
+  return rows[0] as { telegram_user_id: string; nickname: string } | undefined;
+}
+
+async function aliasByMessage(messageId: number) {
+  const { rows } = await pool.query(
+    `SELECT m.telegram_user_id, a.nickname
+     FROM chat_messages m
+     JOIN chat_aliases a ON a.telegram_user_id = m.telegram_user_id
+     WHERE m.id = $1`,
+    [messageId]
+  );
+  return rows[0] as { telegram_user_id: string; nickname: string } | undefined;
+}
+
+async function liveMessageIds() {
+  const { rows } = await pool.query(
+    `SELECT m.id
+     FROM chat_messages m
+     WHERE NOT EXISTS (
+       SELECT 1 FROM chat_bans b WHERE b.telegram_user_id = m.telegram_user_id
+     )
+     ORDER BY m.id DESC
+     LIMIT 50`
+  );
+  return rows.map((row) => Number(row.id)).reverse();
+}
+
+async function bannedNicknames() {
+  const { rows } = await pool.query(
+    `SELECT a.nickname
+     FROM chat_bans b
+     JOIN chat_aliases a ON a.telegram_user_id = b.telegram_user_id
+     ORDER BY a.nickname`
+  );
+  return rows.map((row) => String(row.nickname));
+}
+
 function requireAdmin(request: { headers: Record<string, unknown> }) {
   const header = String(request.headers.authorization || "");
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -71,6 +121,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const userId = request.telegramUser!.id;
     const me = await ensureAlias(userId);
     const after = Number((request.query as { after?: string }).after || 0);
+    const admin = isChatAdmin(userId);
 
     const { rows } = await pool.query(
       `SELECT m.id, m.body, m.created_at, m.telegram_user_id, a.nickname, a.avatar,
@@ -104,7 +155,14 @@ export async function chatRoutes(app: FastifyInstance) {
         : null,
     }));
 
-    return { me, banned: await isBanned(userId), messages };
+    return {
+      me: { ...me, telegramId: userId },
+      banned: await isBanned(userId),
+      admin,
+      bans: admin ? await bannedNicknames() : [],
+      liveIds: await liveMessageIds(),
+      messages,
+    };
   });
 
   app.post("/chat/messages", { preHandler: requireTelegramAuth }, async (request, reply) => {
@@ -144,6 +202,47 @@ export async function chatRoutes(app: FastifyInstance) {
       [userId, body, replyTo]
     );
     return { ok: true, id: Number(inserted.rows[0].id) };
+  });
+
+  app.post("/chat/moderation", { preHandler: requireTelegramAuth }, async (request, reply) => {
+    const userId = request.telegramUser!.id;
+    if (!isChatAdmin(userId)) return reply.code(403).send({ error: "Só o admin." });
+
+    const payload = (request.body || {}) as { action?: string; messageId?: number; nickname?: string };
+    const action = payload.action;
+
+    if (action === "delete") {
+      const id = Number(payload.messageId);
+      if (!id) return reply.code(400).send({ error: "Mensagem ausente." });
+      await pool.query("UPDATE chat_messages SET reply_to_id = NULL WHERE reply_to_id = $1", [id]);
+      const removed = await pool.query("DELETE FROM chat_messages WHERE id = $1", [id]);
+      if (!removed.rowCount) return reply.code(404).send({ error: "Mensagem não encontrada." });
+      return { ok: true, notice: "Mensagem apagada." };
+    }
+
+    if (action === "ban") {
+      const target = await aliasByMessage(Number(payload.messageId));
+      if (!target) return reply.code(404).send({ error: "Mensagem não encontrada." });
+      if (String(target.telegram_user_id) === String(userId)) {
+        return reply.code(400).send({ error: "Você não pode se banir." });
+      }
+      await pool.query(
+        `INSERT INTO chat_bans (telegram_user_id) VALUES ($1)
+         ON CONFLICT (telegram_user_id) DO NOTHING`,
+        [target.telegram_user_id]
+      );
+      return { ok: true, notice: `${target.nickname} foi banido.` };
+    }
+
+    if (action === "unban") {
+      const nickname = String(payload.nickname || "").trim();
+      const target = nickname ? await aliasByNickname(nickname) : undefined;
+      if (!target) return reply.code(404).send({ error: "Apelido não encontrado." });
+      await pool.query("DELETE FROM chat_bans WHERE telegram_user_id = $1", [target.telegram_user_id]);
+      return { ok: true, notice: `${target.nickname} pode escrever de novo.` };
+    }
+
+    return reply.code(400).send({ error: "Ação inválida." });
   });
 
   app.post("/admin/chat/ban", async (request) => {
