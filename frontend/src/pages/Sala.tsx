@@ -163,40 +163,41 @@ export default function Sala() {
 
   return (
     <div className="flex h-[100dvh] flex-col pb-[calc(4.25rem+var(--tg-safe-bottom,0px))]">
-      <header className="shrink-0 bg-bg/95 px-4 pb-3 pt-[max(1rem,var(--tg-safe-top))] backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-[22px] font-bold tracking-tight text-ink">Sala</h1>
+      {(hintOpen || admin) && (
+        <header className="shrink-0 px-4 pb-2 pt-[max(0.5rem,var(--tg-safe-top))]">
           {admin && (
-            <button type="button" onClick={() => setBansOpen(true)} className="text-[13px] text-muted">
-              Banidos{bans.length ? ` (${bans.length})` : ""}
-            </button>
+            <div className="mb-2 flex justify-end">
+              <button type="button" onClick={() => setBansOpen(true)} className="text-[13px] text-muted">
+                Banidos{bans.length ? ` (${bans.length})` : ""}
+              </button>
+            </div>
           )}
-        </div>
-        {hintOpen && (
-          <div className="mt-2 flex items-start gap-3 rounded-xl border border-border bg-surface px-3 py-2">
-            <p className="min-w-0 flex-1 text-[13px] leading-snug text-muted">
-              Seu nome aqui é aleatório. Ninguém vê seu Telegram.
-              {me !== "…" ? ` Você é ${me}.` : ""}
-            </p>
-            <button
-              type="button"
-              aria-label="Fechar"
-              onClick={() => {
-                localStorage.setItem("sala_hint_closed", "1");
-                setHintOpen(false);
-              }}
-              className="shrink-0 text-[18px] leading-none text-muted"
-            >
-              ×
-            </button>
-          </div>
-        )}
-      </header>
+          {hintOpen && (
+            <div className="flex items-start gap-3 rounded-xl border border-border bg-surface px-3 py-2">
+              <p className="min-w-0 flex-1 text-[13px] leading-snug text-muted">
+                Seu nome aqui é aleatório. Ninguém vê seu Telegram.
+                {me !== "…" ? ` Você é ${me}.` : ""}
+              </p>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => {
+                  localStorage.setItem("sala_hint_closed", "1");
+                  setHintOpen(false);
+                }}
+                className="shrink-0 text-[18px] leading-none text-muted"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </header>
+      )}
 
       {!isInsideTelegram() ? (
         <p className="px-4 text-[14px] text-muted">Abra pelo bot do Telegram para escrever na sala.</p>
       ) : (
-        <div ref={scrollerRef} onScroll={onListScroll} className="min-h-0 flex-1 overflow-y-auto px-4">
+        <div ref={scrollerRef} onScroll={onListScroll} className="min-h-0 flex-1 overflow-y-auto px-4 pt-2">
           {!ready ? (
             <p className="text-[14px] text-muted">Abrindo a sala…</p>
           ) : (
