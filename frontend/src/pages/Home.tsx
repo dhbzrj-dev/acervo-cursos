@@ -8,6 +8,7 @@ import { fetchCategories, fetchCourses, fetchMySubscriptions } from "@/lib/api";
 import type { Category, Course, UserSubscription } from "@/types";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useDragScroll } from "@/hooks/useDragScroll";
 
 const ALL_CATEGORY_ID = "all";
 type AccessFilter = "all" | "subscribed" | "available" | "favorites";
@@ -17,6 +18,7 @@ type SortMode = "default" | "newest" | "price";
 export default function Home() {
   useTelegramBackButton(false);
   const favorites = useFavorites();
+  const categoriesScroll = useDragScroll<HTMLDivElement>();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -148,7 +150,15 @@ export default function Home() {
         filterCount={filterCount}
       />
 
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-1">
+      <div
+        ref={categoriesScroll.ref}
+        className="no-scrollbar flex cursor-grab gap-2 overflow-x-auto px-4 pb-1 select-none"
+        onPointerDown={categoriesScroll.onPointerDown}
+        onPointerMove={categoriesScroll.onPointerMove}
+        onPointerUp={categoriesScroll.onPointerUp}
+        onPointerCancel={categoriesScroll.onPointerUp}
+        onClickCapture={categoriesScroll.onClickCapture}
+      >
         <CategoryPill
           category={{ id: ALL_CATEGORY_ID, name: "Todos", emoji: "✨", order: 0 }}
           active={activeCategory === ALL_CATEGORY_ID}
