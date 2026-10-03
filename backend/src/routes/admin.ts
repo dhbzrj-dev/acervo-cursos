@@ -1,5 +1,26 @@
 ﻿import type { FastifyInstance } from "fastify";
 import { pool } from "../db/pool.js";
+import { isCoverStorageConfigured, uploadCoverDataUrl } from "../lib/coverStorage.js";
+
+/**
+ * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
+ * configurado, sobe a imagem e devolve a URL; se não estiver (ou o upload
+ * falhar), mantém o base64 para o salvamento do curso nunca quebrar.
+ */
+async function storeCover(
+  cover: unknown,
+  courseId: string,
+  log: { warn: (obj: unknown, msg: string) => void }
+): Promise<string> {
+  const value = String(cover || "");
+  if (!value.startsWith("data:") || !isCoverStorageConfigured()) return value;
+  try {
+    return await uploadCoverDataUrl(value, courseId);
+  } catch (err) {
+    log.warn({ err }, "Falha ao subir capa para o Blob; salvando em base64");
+    return value;
+  }
+}
 
 function slug(text: string) {
   return String(text)
@@ -79,6 +100,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const benefits = Array.isArray(b.benefits)
       ? b.benefits
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
+    const cover = await storeCover(b.cover_url, id, request.log);
     await pool.query(
       `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
@@ -88,7 +110,7 @@ export async function adminRoutes(app: FastifyInstance) {
         b.name,
         b.description || "",
         benefits,
-        b.cover_url || "",
+        cover,
         Number(b.price_stars || 0),
         b.invite_link || "",
         b.channel_id || "",
@@ -105,6 +127,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const benefits = Array.isArray(b.benefits)
       ? b.benefits
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
+    const cover = await storeCover(b.cover_url, request.params.id, request.log);
     await pool.query(
       `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10 WHERE id=$11`,
       [
@@ -112,7 +135,7 @@ export async function adminRoutes(app: FastifyInstance) {
         b.name,
         b.description || "",
         benefits,
-        b.cover_url || "",
+        cover,
         Number(b.price_stars || 0),
         b.invite_link || "",
         b.channel_id || "",
