@@ -18,6 +18,8 @@ export default function MyCourses() {
   const [active, setActive] = useState<Item[]>([]);
   const [ended, setEnded] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export default function MyCourses() {
 
     async function load() {
       setLoading(true);
+      setLoadError(false);
       const [courses, subs] = await Promise.all([fetchCourses(), fetchMySubscriptions()]);
       if (cancelled) return;
 
@@ -40,11 +43,15 @@ export default function MyCourses() {
       setLoading(false);
     }
 
-    load();
+    load().catch(() => {
+      if (cancelled) return;
+      setLoadError(true);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   async function copyLink(id: string, link: string) {
     hapticImpact("light");
@@ -134,6 +141,14 @@ export default function MyCourses() {
               <div key={i} className="skeleton h-24 w-full rounded-card" />
             ))}
           </div>
+        ) : loadError ? (
+          <EmptyState
+            emoji="⚠️"
+            title="Não foi possível carregar"
+            description="Verifique sua conexão e tente de novo."
+            actionLabel="Tentar de novo"
+            onAction={() => setReloadKey((k) => k + 1)}
+          />
         ) : active.length === 0 && ended.length === 0 ? (
           <EmptyState
             emoji="🎓"

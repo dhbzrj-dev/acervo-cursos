@@ -24,6 +24,8 @@ export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeCategory, setActiveCategory] = useState(ALL_CATEGORY_ID);
   const [query, setQuery] = useState("");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
@@ -36,6 +38,7 @@ export default function Home() {
 
     async function load() {
       setLoading(true);
+      setLoadError(false);
       const [cats, crs, subs] = await Promise.all([
         fetchCategories(),
         fetchCourses(),
@@ -48,11 +51,15 @@ export default function Home() {
       setLoading(false);
     }
 
-    load();
+    load().catch(() => {
+      if (cancelled) return;
+      setLoadError(true);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const subscribedIds = useMemo(
     () => new Set(subscriptions.filter((s) => s.active).map((s) => s.courseId)),
@@ -178,6 +185,14 @@ export default function Home() {
               <CourseCardSkeleton key={i} />
             ))}
           </div>
+        ) : loadError ? (
+          <EmptyState
+            emoji="⚠️"
+            title="Não foi possível carregar"
+            description="Verifique sua conexão e tente de novo."
+            actionLabel="Tentar de novo"
+            onAction={() => setReloadKey((k) => k + 1)}
+          />
         ) : filteredCourses.length === 0 ? (
           <EmptyState
             emoji="🔍"

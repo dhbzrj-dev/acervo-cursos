@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { deactivateSubscription, upsertSubscription } from "../services/backendClient.js";
 import { findCourseByChannelId, findCourseByInviteLink } from "../services/coursesCache.js";
+import { escapeHtml } from "../lib/format.js";
 
 const ACTIVE_STATUSES = new Set(["member", "administrator", "creator"]);
 const INACTIVE_STATUSES = new Set(["left", "kicked", "restricted"]);
@@ -12,10 +13,6 @@ function channelDeepLink(chatId: number): string {
 
 function toIsoDate(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
-}
-
-function escapeMd(text: string): string {
-  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 
 export function registerChatMemberHandler(bot: Bot) {
@@ -31,7 +28,7 @@ export function registerChatMemberHandler(bot: Bot) {
 
       if (!course) return;
 
-      const courseName = escapeMd((course as { name?: string }).name || course.id);
+      const courseName = escapeHtml((course as { name?: string }).name || course.id);
 
       const becameActive =
         ACTIVE_STATUSES.has(new_chat_member.status) &&
@@ -58,14 +55,14 @@ export function registerChatMemberHandler(bot: Bot) {
           await ctx.api.sendMessage(
             telegramUserId,
             [
-              "✅ *Assinatura confirmada*",
+              "✅ <b>Assinatura confirmada</b>",
               "",
-              `Você entrou em *${courseName}*.`,
-              `Acesso até *${untilLabel}*.`,
+              `Você entrou em <b>${courseName}</b>.`,
+              `Acesso até <b>${untilLabel}</b>.`,
               "",
-              "Abra o canal pelo Mini App em *Meus cursos* se precisar do link de novo.",
+              "Abra o canal pelo Mini App em <b>Meus cursos</b> se precisar do link de novo.",
             ].join("\n"),
-            { parse_mode: "Markdown" }
+            { parse_mode: "HTML" }
           );
         } catch (notifyErr) {
           console.warn(`[chat_member] não avisou user=${telegramUserId}:`, notifyErr);
@@ -79,12 +76,12 @@ export function registerChatMemberHandler(bot: Bot) {
           await ctx.api.sendMessage(
             telegramUserId,
             [
-              "⚠️ *Acesso encerrado*",
+              "⚠️ <b>Acesso encerrado</b>",
               "",
-              `Você saiu de *${courseName}* ou a assinatura expirou.`,
-              "Para voltar, abra o catálogo e toque em *Assinar*.",
+              `Você saiu de <b>${courseName}</b> ou a assinatura expirou.`,
+              "Para voltar, abra o catálogo e toque em <b>Assinar</b>.",
             ].join("\n"),
-            { parse_mode: "Markdown" }
+            { parse_mode: "HTML" }
           );
         } catch (notifyErr) {
           console.warn(`[chat_member] não avisou saída user=${telegramUserId}:`, notifyErr);
