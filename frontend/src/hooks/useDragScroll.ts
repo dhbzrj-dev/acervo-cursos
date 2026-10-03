@@ -2,7 +2,13 @@ import { useEffect, useRef } from "react";
 
 export function useDragScroll<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
-  const drag = useRef({ down: false, startX: 0, scrollLeft: 0, moved: false });
+  const drag = useRef({
+    pointerId: -1,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false,
+    active: false,
+  });
 
   useEffect(() => {
     const el = ref.current;
@@ -15,36 +21,43 @@ export function useDragScroll<T extends HTMLElement>() {
       event.preventDefault();
     };
 
+    const onMove = (event: PointerEvent) => {
+      if (!drag.current.active || event.pointerId !== drag.current.pointerId) return;
+      const dx = event.clientX - drag.current.startX;
+      if (Math.abs(dx) <= 8) return;
+      drag.current.moved = true;
+      el.scrollLeft = drag.current.scrollLeft - dx;
+      el.style.cursor = "grabbing";
+    };
+
+    const onUp = (event: PointerEvent) => {
+      if (!drag.current.active || event.pointerId !== drag.current.pointerId) return;
+      drag.current.active = false;
+      el.style.cursor = "";
+    };
+
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
   }, []);
 
   function onPointerDown(event: React.PointerEvent) {
     const el = ref.current;
     if (!el || event.pointerType !== "mouse" || event.button !== 0) return;
     drag.current = {
-      down: true,
+      pointerId: event.pointerId,
       startX: event.clientX,
       scrollLeft: el.scrollLeft,
       moved: false,
+      active: true,
     };
-    el.setPointerCapture(event.pointerId);
-    el.style.cursor = "grabbing";
-  }
-
-  function onPointerMove(event: React.PointerEvent) {
-    const el = ref.current;
-    if (!el || !drag.current.down) return;
-    const dx = event.clientX - drag.current.startX;
-    if (Math.abs(dx) > 4) drag.current.moved = true;
-    el.scrollLeft = drag.current.scrollLeft - dx;
-  }
-
-  function onPointerUp(event: React.PointerEvent) {
-    const el = ref.current;
-    drag.current.down = false;
-    if (el?.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId);
-    if (el) el.style.cursor = "";
   }
 
   function onClickCapture(event: React.MouseEvent) {
@@ -54,5 +67,5 @@ export function useDragScroll<T extends HTMLElement>() {
     drag.current.moved = false;
   }
 
-  return { ref, onPointerDown, onPointerMove, onPointerUp, onClickCapture };
+  return { ref, onPointerDown, onClickCapture };
 }

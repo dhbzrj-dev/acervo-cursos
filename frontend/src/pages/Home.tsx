@@ -152,11 +152,8 @@ export default function Home() {
 
       <div
         ref={categoriesScroll.ref}
-        className="no-scrollbar flex cursor-grab gap-2 overflow-x-auto px-4 pb-1 select-none"
+        className="no-scrollbar flex cursor-grab gap-2 overflow-x-auto px-4 pb-1"
         onPointerDown={categoriesScroll.onPointerDown}
-        onPointerMove={categoriesScroll.onPointerMove}
-        onPointerUp={categoriesScroll.onPointerUp}
-        onPointerCancel={categoriesScroll.onPointerUp}
         onClickCapture={categoriesScroll.onClickCapture}
       >
         <CategoryPill
