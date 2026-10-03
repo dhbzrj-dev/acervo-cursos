@@ -135,12 +135,12 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = request.body as { channel_id: string; price_stars: number; name?: string };
     const token = process.env.BOT_TOKEN;
     if (!token) return { ok: false, error: "BOT_TOKEN ausente" };
-    const telegramRes = await fetch(`https://api.telegram.org/bot${token}/createChatInviteLink`, {
+    const telegramRes = await fetch(`https://api.telegram.org/bot${token}/createChatSubscriptionInviteLink`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: body.channel_id,
-        name: body.name || "Assinatura",
+        name: (body.name || "Assinatura").slice(0, 32),
         subscription_period: 2592000,
         subscription_price: Number(body.price_stars),
       }),
