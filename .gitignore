@@ -1,14 +1,8 @@
-.egit commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/dhbzrj-dev/acervo-cursos.git
-git push -u origin mainnv
-backend/.env
-bot/.env
-frontend/.env
+.env
+*.env.local
+pass.txt
 node_modules
-backend/node_modules
-bot/node_modules
-frontend/node_modules
 dist
 build
+*.tsbuildinfo
 .DS_Store
