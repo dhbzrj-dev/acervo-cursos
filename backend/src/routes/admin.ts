@@ -1,6 +1,7 @@
 ﻿import type { FastifyInstance } from "fastify";
 import { pool } from "../db/pool.js";
 import { isCoverStorageConfigured, uploadCoverDataUrl } from "../lib/coverStorage.js";
+import { checkAdminPassword, createAdminToken, requireAdmin } from "../middleware/adminAuth.js";
 
 /**
  * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
@@ -31,25 +32,13 @@ function slug(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function requireAdmin(request: { headers: Record<string, unknown> }) {
-  const header = String(request.headers.authorization || "");
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const password = process.env.ADMIN_PASSWORD || "";
-  if (!password || token !== password) {
-    const err: Error & { statusCode?: number } = new Error("Unauthorized");
-    err.statusCode = 401;
-    throw err;
-  }
-}
-
 export async function adminRoutes(app: FastifyInstance) {
   app.post("/admin/login", async (request, reply) => {
     const body = (request.body || {}) as { password?: string };
-    const password = process.env.ADMIN_PASSWORD || "";
-    if (!password || body.password !== password) {
+    if (!checkAdminPassword(body.password)) {
       return reply.code(401).send({ ok: false, error: "Senha inválida." });
     }
-    return { ok: true, token: password };
+    return { ok: true, token: createAdminToken() };
   });
 
   app.get("/admin/categories", async (request) => {

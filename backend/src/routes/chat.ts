@@ -105,17 +105,6 @@ async function bannedNicknames() {
   return rows.map((row) => String(row.nickname));
 }
 
-function requireAdmin(request: { headers: Record<string, unknown> }) {
-  const header = String(request.headers.authorization || "");
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const password = process.env.ADMIN_PASSWORD || "";
-  if (!password || token !== password) {
-    const err: Error & { statusCode?: number } = new Error("Unauthorized");
-    err.statusCode = 401;
-    throw err;
-  }
-}
-
 export async function chatRoutes(app: FastifyInstance) {
   app.get("/chat/messages", { preHandler: requireTelegramAuth }, async (request) => {
     const userId = request.telegramUser!.id;
@@ -243,25 +232,5 @@ export async function chatRoutes(app: FastifyInstance) {
     }
 
     return reply.code(400).send({ error: "Ação inválida." });
-  });
-
-  app.post("/admin/chat/ban", async (request) => {
-    requireAdmin(request);
-    const messageId = Number((request.body as { messageId?: number }).messageId);
-    if (!messageId) return { ok: false, error: "messageId ausente" };
-
-    const found = await pool.query(
-      "SELECT telegram_user_id FROM chat_messages WHERE id = $1",
-      [messageId]
-    );
-    if (!found.rows[0]) return { ok: false, error: "Mensagem não encontrada" };
-
-    await pool.query(
-      `INSERT INTO chat_bans (telegram_user_id)
-       VALUES ($1)
-       ON CONFLICT (telegram_user_id) DO NOTHING`,
-      [found.rows[0].telegram_user_id]
-    );
-    return { ok: true };
   });
 }

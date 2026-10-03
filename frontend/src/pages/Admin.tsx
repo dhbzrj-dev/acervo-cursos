@@ -16,10 +16,23 @@ type Course = {
   preview_url?: string;
 };
 
+const SESSION_KEY = "admin_session";
+
+function readSession(): string {
+  try {
+    // Versões antigas guardavam a própria senha em "admin_token".
+    localStorage.removeItem("admin_token");
+    return localStorage.getItem(SESSION_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 export default function Admin() {
   const api = import.meta.env.VITE_API_URL;
-  const [password, setPassword] = useState(localStorage.getItem("admin_token") || "");
-  const [ok, setOk] = useState(!!localStorage.getItem("admin_token"));
+  const [password, setPassword] = useState("");
+  const [session, setSession] = useState(readSession);
+  const ok = Boolean(session);
   const [categories, setCategories] = useState<Category[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [catName, setCatName] = useState("");
@@ -37,7 +50,27 @@ export default function Admin() {
     is_active: true,
     preview_url: "",
   });
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${password}` };
+  function logout() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* noop */
+    }
+    setSession("");
+  }
+
+  /** fetch autenticado; sessão expirada ou inválida volta para a tela de login. */
+  async function adminFetch(path: string, init: RequestInit = {}) {
+    const res = await fetch(`${api}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session}` },
+    });
+    if (res.status === 401) {
+      logout();
+      throw new Error("Sessão expirada. Entre de novo.");
+    }
+    return res;
+  }
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -46,21 +79,31 @@ export default function Admin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
     });
-    if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { token?: string };
+    if (!res.ok || !data.token) {
       alert("Senha errada");
       return;
     }
-    localStorage.setItem("admin_token", password);
-    setOk(true);
+    try {
+      localStorage.setItem(SESSION_KEY, data.token);
+    } catch {
+      /* sessão vale só enquanto a aba estiver aberta */
+    }
+    setPassword("");
+    setSession(data.token);
   }
 
   async function load() {
-    const [cats, list] = await Promise.all([
-      fetch(`${api}/admin/categories`, { headers }).then((r) => r.json()),
-      fetch(`${api}/admin/courses`, { headers }).then((r) => r.json()),
-    ]);
-    setCategories(cats);
-    setCourses(list);
+    try {
+      const [cats, list] = await Promise.all([
+        adminFetch("/admin/categories").then((r) => r.json()),
+        adminFetch("/admin/courses").then((r) => r.json()),
+      ]);
+      setCategories(cats);
+      setCourses(list);
+    } catch {
+      /* adminFetch já tratou 401 */
+    }
   }
 
   useEffect(() => {
@@ -69,9 +112,8 @@ export default function Admin() {
 
   async function createCategory(e: React.FormEvent) {
     e.preventDefault();
-    await fetch(`${api}/admin/categories`, {
+    await adminFetch("/admin/categories", {
       method: "POST",
-      headers,
       body: JSON.stringify({ name: catName, emoji: catEmoji, order: categories.length + 1 }),
     });
     setCatName("");
@@ -96,10 +138,9 @@ export default function Admin() {
 
   async function saveCourse(e: React.FormEvent) {
     e.preventDefault();
-    const url = editingId ? `${api}/admin/courses/${editingId}` : `${api}/admin/courses`;
-    const res = await fetch(url, {
+    const path = editingId ? `/admin/courses/${editingId}` : "/admin/courses";
+    const res = await adminFetch(path, {
       method: editingId ? "PUT" : "POST",
-      headers,
       body: JSON.stringify(form),
     });
     if (!res.ok) {
@@ -116,9 +157,8 @@ export default function Admin() {
       alert("Preencha Channel ID e Stars");
       return;
     }
-    const res = await fetch(`${api}/admin/invite-link`, {
+    const res = await adminFetch("/admin/invite-link", {
       method: "POST",
-      headers,
       body: JSON.stringify({
         channel_id: form.channel_id,
         price_stars: form.price_stars,
@@ -140,7 +180,7 @@ export default function Admin() {
 
   async function removeCourse(id: string) {
     if (!confirm("Apagar este curso?")) return;
-    await fetch(`${api}/admin/courses/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/admin/courses/${id}`, { method: "DELETE" });
     load();
   }
 
@@ -162,7 +202,12 @@ export default function Admin() {
 
   return (
     <div className="mx-auto max-w-3xl p-6 pb-20">
-      <h1 className="mb-6 text-2xl font-bold">Painel admin</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Painel admin</h1>
+        <button type="button" onClick={logout} className="text-sm text-muted">
+          Sair
+        </button>
+      </div>
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold">Nova categoria</h2>
