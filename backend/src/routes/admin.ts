@@ -138,8 +138,23 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>("/admin/courses/:id", async (request) => {
     requireAdmin(request);
-    await pool.query("DELETE FROM courses WHERE id = $1", [request.params.id]);
-    return { ok: true };
+    const id = request.params.id;
+    // Curso com histórico de assinaturas não pode ser apagado (FK) e o
+    // histórico deve ficar: nesse caso só some do catálogo.
+    const { rows } = await pool.query(
+      "SELECT count(*)::int AS n FROM user_subscriptions WHERE course_id = $1",
+      [id]
+    );
+    if (rows[0].n > 0) {
+      await pool.query("UPDATE courses SET is_active = FALSE WHERE id = $1", [id]);
+      return {
+        ok: true,
+        hidden: true,
+        notice: `O curso tem ${rows[0].n} assinatura(s) no histórico, então foi ocultado do catálogo em vez de apagado.`,
+      };
+    }
+    await pool.query("DELETE FROM courses WHERE id = $1", [id]);
+    return { ok: true, notice: "Curso apagado." };
   });
 
   app.post("/admin/invite-link", async (request) => {

@@ -180,7 +180,9 @@ export default function Admin() {
 
   async function removeCourse(id: string) {
     if (!confirm("Apagar este curso?")) return;
-    await adminFetch(`/admin/courses/${id}`, { method: "DELETE" });
+    const res = await adminFetch(`/admin/courses/${id}`, { method: "DELETE" });
+    const data = (await res.json().catch(() => ({}))) as { notice?: string; error?: string; message?: string };
+    alert(res.ok ? data.notice || "Curso apagado." : data.error || data.message || "Não foi possível apagar o curso.");
     load();
   }
 
@@ -312,7 +314,7 @@ export default function Admin() {
           {courses.map((c) => (
             <li key={c.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
               <span>
-                {c.name} — {c.price_stars} ★
+                {c.name} — {c.price_stars} ★{c.is_active === false ? " (oculto)" : ""}
               </span>
               <span className="flex gap-3">
                 <button type="button" onClick={() => editCourse(c)} className="text-sky-400">
