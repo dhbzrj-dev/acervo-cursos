@@ -2,7 +2,7 @@ import type { Bot } from "grammy";
 import { deactivateSubscription, upsertSubscription } from "../services/backendClient.js";
 import { findCourseByChannelId, findCourseByInviteLink } from "../services/coursesCache.js";
 import { escapeHtml } from "../lib/format.js";
-import { isInChat, subscriptionEndsOn, toIsoDate } from "../lib/membership.js";
+import { isInChat, subscriptionEndsOn } from "../lib/membership.js";
 
 function channelDeepLink(chatId: number): string {
   const raw = String(chatId).replace(/^-100/, "").replace(/^-/, "");
@@ -26,13 +26,21 @@ export function registerChatMemberHandler(bot: Bot) {
 
       const wasIn = isInChat(old_chat_member);
       const isIn = isInChat(new_chat_member);
-      const becameActive = isIn && !wasIn;
-      const becameInactive = !isIn && wasIn;
       const renewedOn = subscriptionEndsOn(new_chat_member);
+      // Só conta como assinatura quem entrou pagando: o Telegram informa a data
+      // de expiração (`until_date`) apenas para assinaturas pagas em Stars.
+      // Entradas grátis (link principal, canal público, admin que adicionou)
+      // não viram assinatura.
+      const becameActive = isIn && !wasIn && renewedOn !== null;
+      const becameInactive = !isIn && wasIn;
+      const hadSubscription = subscriptionEndsOn(old_chat_member) !== null;
+
+      if (isIn && !wasIn && renewedOn === null) {
+        console.log(`[chat_member] entrada sem assinatura paga ignorada: user=${telegramUserId} course=${course.id}`);
+      }
 
       if (becameActive) {
-        const renewsAt =
-          renewedOn ?? toIsoDate(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60);
+        const renewsAt = renewedOn;
 
         await upsertSubscription({
           telegramUserId,
@@ -63,19 +71,22 @@ export function registerChatMemberHandler(bot: Bot) {
       } else if (becameInactive) {
         await deactivateSubscription({ telegramUserId, courseId: course.id });
 
-        try {
-          await ctx.api.sendMessage(
-            telegramUserId,
-            [
-              "⚠️ <b>Acesso encerrado</b>",
-              "",
-              `Você saiu de <b>${courseName}</b> ou a assinatura expirou.`,
-              "Para voltar, abra o catálogo e toque em <b>Assinar</b>.",
-            ].join("\n"),
-            { parse_mode: "HTML" }
-          );
-        } catch (notifyErr) {
-          console.warn(`[chat_member] não avisou saída user=${telegramUserId}:`, notifyErr);
+        // Quem estava de graça no canal não tinha assinatura para encerrar.
+        if (hadSubscription) {
+          try {
+            await ctx.api.sendMessage(
+              telegramUserId,
+              [
+                "⚠️ <b>Acesso encerrado</b>",
+                "",
+                `Você saiu de <b>${courseName}</b> ou a assinatura expirou.`,
+                "Para voltar, abra o catálogo e toque em <b>Assinar</b>.",
+              ].join("\n"),
+              { parse_mode: "HTML" }
+            );
+          } catch (notifyErr) {
+            console.warn(`[chat_member] não avisou saída user=${telegramUserId}:`, notifyErr);
+          }
         }
       } else if (isIn && renewedOn && renewedOn !== subscriptionEndsOn(old_chat_member)) {
         // Renovação: continua no canal, só a data de expiração andou.
