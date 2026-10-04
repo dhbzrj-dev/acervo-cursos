@@ -15,7 +15,7 @@ bot.catch((err) => {
 });
 
 async function main() {
-  console.log("Iniciando bot do Acervo de Cursos...");
+  console.log("Iniciando bot do Olimpocursos...");
 
   await bot.start({
     allowed_updates: ["message", "callback_query", "chat_member"],

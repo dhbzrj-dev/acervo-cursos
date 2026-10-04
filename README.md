@@ -1,4 +1,4 @@
-# Acervo de Cursos — Telegram Mini App
+# Olimpocursos — Telegram Mini App
 
 Catálogo de cursos em formato de Telegram Mini App. Cada curso é um canal
 privado do Telegram, com assinatura mensal cobrada em **Stars** através de

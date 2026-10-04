@@ -1,4 +1,4 @@
--- Schema do Acervo de Cursos, espelhando o banco de produção (Neon).
+-- Schema do Olimpocursos, espelhando o banco de produção (Neon).
 -- Idempotente: pode ser aplicado de novo (`npm run db:migrate`) sem perder
 -- dados; só cria o que estiver faltando.
 

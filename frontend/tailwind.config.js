@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Design system do Acervo de Cursos — tema preto, alto contraste.
+        // Design system do Olimpocursos — tema preto, alto contraste.
         bg: "#0A0A0A",        // fundo principal
         surface: "#141414",   // cards
         border: "#222222",    // bordas

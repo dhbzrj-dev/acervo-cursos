@@ -14,7 +14,7 @@ export default function Header({
   return (
     <header className="sticky top-0 z-10 bg-bg/95 backdrop-blur pt-[max(1rem,var(--tg-safe-top))] px-4 pb-3">
       <h1 className="text-[22px] font-bold tracking-tight text-ink">
-        Acervo de Cursos
+        Olimpocursos
       </h1>
 
       <div className="mt-3 flex items-center gap-2">

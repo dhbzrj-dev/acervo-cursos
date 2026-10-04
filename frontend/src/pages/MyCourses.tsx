@@ -153,7 +153,7 @@ export default function MyCourses() {
           <EmptyState
             emoji="🎓"
             title="Você ainda não tem cursos"
-            description="Assine um curso do acervo para acompanhar suas assinaturas ativas aqui."
+            description="Assine um curso do Olimpocursos para acompanhar suas assinaturas ativas aqui."
             actionLabel="Explorar cursos"
             onAction={() => navigate("/")}
           />
