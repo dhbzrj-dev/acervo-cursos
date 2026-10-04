@@ -77,7 +77,7 @@ export function startRenewalReminderJob(bot: Bot) {
               `Renova em: <b>${formatDate(item.renews_at)}</b>`,
               "",
               "O Telegram cobra de novo automaticamente, do seu saldo de Stars, se você continuar no canal.",
-              "💠 Compra Stars com Pix? Garanta saldo suficiente antes dessa data.",
+              "💠 Paga com Pix? Deixe saldo de Stars para a renovação.",
               "Para cancelar, saia do canal antes da data.",
             ].join("\n"),
             { parse_mode: "HTML" }
