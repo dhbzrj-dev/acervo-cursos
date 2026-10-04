@@ -1,11 +1,13 @@
 import { useTelegramBackButton, useTelegramUser } from "@/hooks/useTelegram";
 import { fetchMySubscriptions } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const SUPPORT_URL = "https://t.me/Olimpocursosreal";
 
 export default function Profile() {
   useTelegramBackButton(false);
+  const navigate = useNavigate();
   const tgUser = useTelegramUser();
   const [activeCount, setActiveCount] = useState<number | null>(null);
 
@@ -62,9 +64,9 @@ export default function Profile() {
         </div>
 
         <div className="mt-3 flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-          <ProfileLink label="Histórico de pagamentos" />
+          <ProfileLink label="Minhas assinaturas" onClick={() => navigate("/meus-cursos")} />
           <ProfileLink label="Suporte" onClick={openSupport} />
-          <ProfileLink label="Termos e privacidade" />
+          <ProfileLink label="Termos e privacidade" onClick={() => navigate("/termos")} />
         </div>
       </div>
     </div>

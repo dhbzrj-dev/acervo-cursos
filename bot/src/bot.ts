@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 import { env } from "./config/env.js";
-import { registerStartCommand } from "./commands/start.js";
+import { BOT_COMMANDS, registerStartCommand } from "./commands/start.js";
 import { registerChatMemberHandler } from "./handlers/chatMember.js";
 import { startRenewalReminderJob } from "./jobs/renewalReminder.js";
 
@@ -16,6 +16,10 @@ bot.catch((err) => {
 
 async function main() {
   console.log("Iniciando bot do Olimpocursos...");
+
+  await bot.api
+    .setMyCommands(BOT_COMMANDS)
+    .catch((err) => console.warn("Não atualizou a lista de comandos:", err));
 
   await bot.start({
     allowed_updates: ["message", "callback_query", "chat_member"],

@@ -8,6 +8,7 @@ import Categories from "@/pages/Categories";
 import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
 import Sala from "@/pages/Sala";
+import Termos from "@/pages/Termos";
 
 export default function App() {
   const location = useLocation();
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/perfil" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/sala" element={<Sala />} />
+        <Route path="/termos" element={<Termos />} />
       </Routes>
       {!hideBottomNav && <BottomNav />}
     </div>
