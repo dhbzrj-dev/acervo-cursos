@@ -68,6 +68,41 @@ export async function deactivateSubscription(
     [telegramUserId, courseId]
   );
 }
+/**
+ * Assinaturas ativas que vencem em até `days` dias — ou que já venceram e
+ * continuam marcadas como ativas. O bot confere cada uma com `getChatMember`
+ * e corrige a data, já que o Telegram não avisa toda renovação.
+ */
+export async function listSubscriptionsToSync(days: number) {
+  const { rows } = await pool.query(
+    `SELECT s.telegram_user_id, s.course_id, s.renews_at, s.channel_deep_link,
+            c.channel_id
+     FROM user_subscriptions s
+     JOIN courses c ON c.id = s.course_id
+     WHERE s.active = TRUE
+       AND s.renews_at <= (CURRENT_DATE + $1::int)
+     ORDER BY s.renews_at ASC`,
+    [days]
+  );
+  return rows.map((row) => ({
+    telegramUserId: Number(row.telegram_user_id),
+    courseId: row.course_id as string,
+    renewsAt: toIsoDay(row.renews_at),
+    channelDeepLink: row.channel_deep_link as string,
+    channelId: row.channel_id as string,
+  }));
+}
+
+function toIsoDay(value: unknown): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 export async function listSubscriptionsDueInDays(days: number) {
   const { rows } = await pool.query(
     `SELECT s.telegram_user_id, s.course_id, s.renews_at, c.name AS course_name

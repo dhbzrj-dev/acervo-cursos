@@ -32,6 +32,26 @@ export function deactivateSubscription(params: {
   return callInternalApi("/internal/subscriptions/deactivate", params);
 }
 
+export async function listToSync(days = 3) {
+  const res = await fetch(
+    `${env.backendUrl}/internal/subscriptions/to-sync?days=${days}`,
+    { headers: { "x-internal-key": env.internalApiKey } }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Falha ao listar assinaturas para sincronizar: ${res.status} ${text}`);
+  }
+  return res.json() as Promise<
+    {
+      telegramUserId: number;
+      courseId: string;
+      renewsAt: string;
+      channelDeepLink: string;
+      channelId: string;
+    }[]
+  >;
+}
+
 export async function listDueSoon(days = 3) {
   const res = await fetch(
     `${env.backendUrl}/internal/subscriptions/due-soon?days=${days}`,

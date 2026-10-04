@@ -2,17 +2,11 @@ import type { Bot } from "grammy";
 import { deactivateSubscription, upsertSubscription } from "../services/backendClient.js";
 import { findCourseByChannelId, findCourseByInviteLink } from "../services/coursesCache.js";
 import { escapeHtml } from "../lib/format.js";
-
-const ACTIVE_STATUSES = new Set(["member", "administrator", "creator"]);
-const INACTIVE_STATUSES = new Set(["left", "kicked", "restricted"]);
+import { isInChat, subscriptionEndsOn, toIsoDate } from "../lib/membership.js";
 
 function channelDeepLink(chatId: number): string {
   const raw = String(chatId).replace(/^-100/, "").replace(/^-/, "");
   return `https://t.me/c/${raw}/1`;
-}
-
-function toIsoDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toISOString().slice(0, 10);
 }
 
 export function registerChatMemberHandler(bot: Bot) {
@@ -30,27 +24,24 @@ export function registerChatMemberHandler(bot: Bot) {
 
       const courseName = escapeHtml((course as { name?: string }).name || course.id);
 
-      const becameActive =
-        ACTIVE_STATUSES.has(new_chat_member.status) &&
-        !ACTIVE_STATUSES.has(old_chat_member.status);
-      const becameInactive =
-        INACTIVE_STATUSES.has(new_chat_member.status) &&
-        ACTIVE_STATUSES.has(old_chat_member.status);
+      const wasIn = isInChat(old_chat_member);
+      const isIn = isInChat(new_chat_member);
+      const becameActive = isIn && !wasIn;
+      const becameInactive = !isIn && wasIn;
+      const renewedOn = subscriptionEndsOn(new_chat_member);
 
       if (becameActive) {
-        const untilDate =
-          "until_date" in new_chat_member && new_chat_member.until_date
-            ? new_chat_member.until_date
-            : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+        const renewsAt =
+          renewedOn ?? toIsoDate(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60);
 
         await upsertSubscription({
           telegramUserId,
           courseId: course.id,
-          renewsAt: toIsoDate(untilDate),
+          renewsAt,
           channelDeepLink: channelDeepLink(chat.id),
         });
 
-        const untilLabel = toIsoDate(untilDate).split("-").reverse().join("/");
+        const untilLabel = renewsAt.split("-").reverse().join("/");
         try {
           await ctx.api.sendMessage(
             telegramUserId,
@@ -86,6 +77,15 @@ export function registerChatMemberHandler(bot: Bot) {
         } catch (notifyErr) {
           console.warn(`[chat_member] não avisou saída user=${telegramUserId}:`, notifyErr);
         }
+      } else if (isIn && renewedOn && renewedOn !== subscriptionEndsOn(old_chat_member)) {
+        // Renovação: continua no canal, só a data de expiração andou.
+        await upsertSubscription({
+          telegramUserId,
+          courseId: course.id,
+          renewsAt: renewedOn,
+          channelDeepLink: channelDeepLink(chat.id),
+        });
+        console.log(`[chat_member] renovada: user=${telegramUserId} course=${course.id} até ${renewedOn}`);
       }
     } catch (err) {
       console.error("[chat_member] falha ao sincronizar assinatura:", err);

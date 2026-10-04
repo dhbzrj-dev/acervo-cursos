@@ -3,6 +3,7 @@ import { requireInternalKey } from "../middleware/internalAuth.js";
 import {
   deactivateSubscription,
   listSubscriptionsDueInDays,
+  listSubscriptionsToSync,
   markRenewalReminderSent,
   upsertSubscription,
 } from "../repositories/subscriptions.repo.js";
@@ -60,6 +61,11 @@ export async function internalRoutes(app: FastifyInstance) {
       reply.code(204).send();
     }
   );
+
+  app.get("/internal/subscriptions/to-sync", async (request) => {
+    const days = Number((request.query as { days?: string }).days ?? 3);
+    return listSubscriptionsToSync(Number.isFinite(days) ? days : 3);
+  });
 
   app.get("/internal/subscriptions/due-soon", async (request) => {
     const days = Number((request.query as { days?: string }).days ?? 3);
