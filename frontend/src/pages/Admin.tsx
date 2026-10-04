@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import CoverCropper from "@/components/CoverCropper";
 
 type Category = { id: string; name: string; emoji?: string; order?: number };
@@ -18,6 +18,15 @@ type Course = {
 };
 
 const SESSION_KEY = "admin_session";
+
+/**
+ * Erros nossos vêm em `error` com a explicação; erros do Fastify vêm com
+ * `error: "Bad Request"` genérico e o motivo real em `message`.
+ */
+function errorText(data: { error?: string; message?: string; statusCode?: number }): string {
+  if (data.statusCode && data.message) return data.message;
+  return data.error || data.message || "";
+}
 
 function readSession(): string {
   try {
@@ -63,10 +72,10 @@ export default function Admin() {
 
   /** fetch autenticado; sessão expirada ou inválida volta para a tela de login. */
   async function adminFetch(path: string, init: RequestInit = {}) {
-    const res = await fetch(`${api}${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session}` },
-    });
+    const headers: Record<string, string> = { Authorization: `Bearer ${session}` };
+    // Só declara JSON quando há corpo: o Fastify recusa (400) JSON vazio.
+    if (init.body !== undefined) headers["Content-Type"] = "application/json";
+    const res = await fetch(`${api}${path}`, { ...init, headers });
     if (res.status === 401) {
       logout();
       throw new Error("Sessão expirada. Entre de novo.");
@@ -126,7 +135,7 @@ export default function Admin() {
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-      alert(data.error || data.message || "Não foi possível salvar a categoria.");
+      alert(errorText(data) || "Não foi possível salvar a categoria.");
       return;
     }
     cancelCategoryEdit();
@@ -150,7 +159,7 @@ export default function Admin() {
     const res = await adminFetch(`/admin/categories/${category.id}`, { method: "DELETE" });
     const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
     if (!res.ok) {
-      alert(data.error || data.message || "Não foi possível apagar a categoria.");
+      alert(errorText(data) || "Não foi possível apagar a categoria.");
       return;
     }
     if (catEditingId === category.id) cancelCategoryEdit();
@@ -239,7 +248,7 @@ export default function Admin() {
     alert(
       res.ok
         ? `Enviando para ${data.total} pessoa(s). Leva cerca de ${Math.max(1, Math.ceil((data.total ?? 0) / 1200))} minuto(s).`
-        : data.error || data.message || "Não foi possível enviar o aviso."
+        : errorText(data) || "Não foi possível enviar o aviso."
     );
     load();
   }
@@ -248,7 +257,7 @@ export default function Admin() {
     if (!confirm("Apagar este curso?")) return;
     const res = await adminFetch(`/admin/courses/${id}`, { method: "DELETE" });
     const data = (await res.json().catch(() => ({}))) as { notice?: string; error?: string; message?: string };
-    alert(res.ok ? data.notice || "Curso apagado." : data.error || data.message || "Não foi possível apagar o curso.");
+    alert(res.ok ? data.notice || "Curso apagado." : errorText(data) || "Não foi possível apagar o curso.");
     load();
   }
 
