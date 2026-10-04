@@ -49,14 +49,18 @@ export async function adminRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  app.post("/admin/categories", async (request) => {
+  app.post("/admin/categories", async (request, reply) => {
     requireAdmin(request);
     const b = request.body as { name: string; emoji?: string; order?: number };
     const id = slug(b.name);
-    await pool.query(
-      "INSERT INTO categories (id, name, emoji, \"order\") VALUES ($1, $2, $3, $4)",
+    if (!id) return reply.code(400).send({ ok: false, error: "Dê um nome para a categoria." });
+    const created = await pool.query(
+      "INSERT INTO categories (id, name, emoji, \"order\") VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
       [id, b.name, b.emoji || "📁", Number(b.order ?? 0)]
     );
+    if (!created.rowCount) {
+      return reply.code(409).send({ ok: false, error: "Já existe uma categoria com esse nome." });
+    }
     return { ok: true, id };
   });
 
@@ -70,9 +74,22 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.delete<{ Params: { id: string } }>("/admin/categories/:id", async (request) => {
+  app.delete<{ Params: { id: string } }>("/admin/categories/:id", async (request, reply) => {
     requireAdmin(request);
-    await pool.query("DELETE FROM categories WHERE id = $1", [request.params.id]);
+    const id = request.params.id;
+    const { rows } = await pool.query(
+      "SELECT name FROM courses WHERE category_id = $1 ORDER BY name",
+      [id]
+    );
+    if (rows.length > 0) {
+      const names = rows.map((r) => r.name).join(", ");
+      return reply.code(409).send({
+        ok: false,
+        error: `Esta categoria tem ${rows.length} curso(s): ${names}. Mova-os para outra categoria (ou apague) antes.`,
+      });
+    }
+    await pool.query("DELETE FROM user_category_follows WHERE category_id = $1", [id]);
+    await pool.query("DELETE FROM categories WHERE id = $1", [id]);
     return { ok: true };
   });
 

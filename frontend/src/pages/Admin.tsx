@@ -37,6 +37,7 @@ export default function Admin() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [catName, setCatName] = useState("");
   const [catEmoji, setCatEmoji] = useState("📁");
+  const [catEditingId, setCatEditingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -110,13 +111,48 @@ export default function Admin() {
     if (ok) load();
   }, [ok]);
 
-  async function createCategory(e: React.FormEvent) {
+  async function saveCategory(e: React.FormEvent) {
     e.preventDefault();
-    await adminFetch("/admin/categories", {
-      method: "POST",
-      body: JSON.stringify({ name: catName, emoji: catEmoji, order: categories.length + 1 }),
+    if (!catName.trim()) return;
+    const editing = categories.find((c) => c.id === catEditingId);
+    const res = await adminFetch(editing ? `/admin/categories/${editing.id}` : "/admin/categories", {
+      method: editing ? "PUT" : "POST",
+      body: JSON.stringify({
+        name: catName.trim(),
+        emoji: catEmoji,
+        order: editing ? editing.order ?? 0 : categories.length + 1,
+      }),
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+      alert(data.error || data.message || "Não foi possível salvar a categoria.");
+      return;
+    }
+    cancelCategoryEdit();
+    load();
+  }
+
+  function editCategory(category: Category) {
+    setCatEditingId(category.id);
+    setCatName(category.name);
+    setCatEmoji(category.emoji || "📁");
+  }
+
+  function cancelCategoryEdit() {
+    setCatEditingId(null);
     setCatName("");
+    setCatEmoji("📁");
+  }
+
+  async function removeCategory(category: Category) {
+    if (!confirm(`Apagar a categoria "${category.name}"?`)) return;
+    const res = await adminFetch(`/admin/categories/${category.id}`, { method: "DELETE" });
+    const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    if (!res.ok) {
+      alert(data.error || data.message || "Não foi possível apagar a categoria.");
+      return;
+    }
+    if (catEditingId === category.id) cancelCategoryEdit();
     load();
   }
 
@@ -212,8 +248,10 @@ export default function Admin() {
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold">Nova categoria</h2>
-        <form onSubmit={createCategory} className="flex gap-2">
+        <h2 className="mb-3 text-lg font-semibold">
+          {catEditingId ? "Editar categoria" : "Nova categoria"}
+        </h2>
+        <form onSubmit={saveCategory} className="flex gap-2">
           <input
             className="w-20 rounded-xl bg-white/10 p-3"
             value={catEmoji}
@@ -225,12 +263,29 @@ export default function Admin() {
             onChange={(e) => setCatName(e.target.value)}
             placeholder="Nome da categoria"
           />
-          <button className="rounded-xl bg-white px-4 font-semibold text-black">Criar</button>
+          <button className="rounded-xl bg-white px-4 font-semibold text-black">
+            {catEditingId ? "Salvar" : "Criar"}
+          </button>
+          {catEditingId && (
+            <button type="button" onClick={cancelCategoryEdit} className="rounded-xl bg-white/10 px-4">
+              Cancelar
+            </button>
+          )}
         </form>
-        <ul className="mt-3 space-y-1">
+        <ul className="mt-3 space-y-2">
           {categories.map((c) => (
-            <li key={c.id}>
-              {c.emoji} {c.name}
+            <li key={c.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
+              <span>
+                {c.emoji} {c.name}
+              </span>
+              <span className="flex gap-3">
+                <button type="button" onClick={() => editCategory(c)} className="text-sky-400">
+                  Editar
+                </button>
+                <button type="button" onClick={() => removeCategory(c)} className="text-red-400">
+                  Apagar
+                </button>
+              </span>
             </li>
           ))}
         </ul>
@@ -246,13 +301,15 @@ export default function Admin() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <select
-            className="rounded-xl bg-white/10 p-3"
+            className="rounded-xl bg-white/10 p-3 [color-scheme:dark]"
             value={form.category_id}
             onChange={(e) => setForm({ ...form, category_id: e.target.value })}
           >
-            <option value="">Categoria</option>
+            <option value="" className="bg-[#1a1a1a] text-white">
+              Categoria
+            </option>
             {categories.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option key={c.id} value={c.id} className="bg-[#1a1a1a] text-white">
                 {c.emoji} {c.name}
               </option>
             ))}
