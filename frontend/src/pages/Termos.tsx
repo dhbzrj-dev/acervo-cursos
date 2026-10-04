@@ -14,7 +14,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: "2. Assinatura e pagamento",
     body: [
       "O pagamento é feito pelo próprio Telegram, em Stars, no momento em que você entra no canal pelo link de assinatura do curso.",
-      "A assinatura renova automaticamente a cada 30 dias, pelo mesmo valor, enquanto você continuar no canal.",
+      "A assinatura renova automaticamente a cada 30 dias, pelo mesmo valor, enquanto você continuar no canal. A renovação é descontada do seu saldo de Stars; se não houver saldo suficiente, a assinatura não é renovada.",
+      "No Brasil, as Stars podem ser compradas com Pix: no Android, direto na tela de pagamento do Google Play; no iPhone, usando saldo da Conta Apple carregado com cartão-presente comprado via Pix.",
       "Para cancelar, basta sair do canal antes da data de renovação. Você recebe um lembrete pelo bot 3 dias antes.",
     ],
   },

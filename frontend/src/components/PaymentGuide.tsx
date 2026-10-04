@@ -109,6 +109,8 @@ export function PaymentSheet({ open, priceStars, mode, onContinue, onClose }: Pa
           <Fact icon="🔔" text="Aviso 3 dias antes" />
         </div>
 
+        <PixBox />
+
         {mode === "checkout" ? (
           <>
             <label className="mt-5 flex items-center gap-2 text-[13px] text-muted">
@@ -145,6 +147,35 @@ export function PaymentSheet({ open, priceStars, mode, onContinue, onClose }: Pa
   );
 }
 
+/**
+ * Pix no Brasil: o Pix compra as Stars (compra avulsa na loja do celular);
+ * a mensalidade do curso é descontada do saldo de Stars.
+ */
+function PixBox() {
+  return (
+    <div className="mt-4 rounded-card border border-[#32BCAD]/40 bg-[#32BCAD]/10 p-4">
+      <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+        <span className="rounded-md bg-[#32BCAD] px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-black">PIX</span>
+        Dá para pagar com Pix
+      </p>
+      <ul className="mt-3 flex flex-col gap-2.5 text-[13px] leading-snug text-ink/85">
+        <li>
+          <b className="text-ink">Android:</b> ao comprar as Stars, escolha <b className="text-ink">Pix</b> na tela do
+          Google Play. Pague o QR Code ou o código no app do seu banco — as Stars caem em até 10 minutos.
+        </li>
+        <li>
+          <b className="text-ink">iPhone:</b> coloque saldo na sua Conta Apple com um cartão-presente comprado via Pix
+          (no app do seu banco ou em lojas) e use esse saldo para comprar as Stars.
+        </li>
+      </ul>
+      <p className="mt-3 rounded-lg bg-black/30 px-3 py-2 text-[12.5px] leading-snug text-muted">
+        ⚠️ O Pix compra as Stars; a mensalidade sai do seu saldo de Stars. Antes de cada renovação, deixe saldo
+        suficiente — o bot avisa 3 dias antes.
+      </p>
+    </div>
+  );
+}
+
 function Fact({ icon, text }: { icon: string; text: string }) {
   return (
     <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-bg px-2 py-3 text-center">
@@ -162,12 +193,16 @@ const FAQ: { q: string; a: string }[] = [
     a: "É a moeda digital do próprio Telegram, usada para pagar dentro do app. A cobrança do curso acontece toda pelo Telegram — você não informa cartão para nós.",
   },
   {
+    q: "Posso pagar com Pix?",
+    a: "Sim, comprando as Stars com Pix. No Android, ao comprar Stars escolha “Pix” na tela do Google Play e pague o QR Code ou o código no app do seu banco; as Stars caem em até 10 minutos. No iPhone, coloque saldo na Conta Apple com um cartão-presente comprado via Pix e use esse saldo para comprar as Stars.",
+  },
+  {
     q: "Como compro Stars?",
-    a: "Na hora de assinar, se faltar saldo, o Telegram oferece a compra na mesma tela. Você também pode comprar antes em Configurações → Minhas Stars, no app do Telegram.",
+    a: "Na hora de assinar, se faltar saldo, o Telegram oferece a compra na mesma tela. Você também pode comprar antes em Configurações → Minhas Stars, no app do Telegram. O pagamento é feito pela loja do seu celular (Google Play ou App Store), com cartão, Pix ou saldo da loja.",
   },
   {
     q: "Quando sou cobrado?",
-    a: "No momento em que entra no canal e, depois, automaticamente a cada 30 dias, pelo mesmo valor, enquanto continuar no canal.",
+    a: "No momento em que entra no canal e, depois, automaticamente a cada 30 dias, pelo mesmo valor, enquanto continuar no canal. A cobrança sai do seu saldo de Stars: se você compra Stars com Pix, deixe saldo suficiente antes de cada renovação — o bot avisa 3 dias antes.",
   },
   {
     q: "Como cancelo?",
