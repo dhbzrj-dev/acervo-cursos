@@ -2,6 +2,8 @@
 import { pool } from "../db/pool.js";
 import { isCoverStorageConfigured, uploadCoverDataUrl } from "../lib/coverStorage.js";
 import { checkAdminPassword, createAdminToken, requireAdmin } from "../middleware/adminAuth.js";
+import { broadcastNewCourse, isBroadcastRunning } from "../lib/notifyNewCourse.js";
+import { listNotifiableUserIds } from "../repositories/botUsers.repo.js";
 
 /**
  * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
@@ -172,6 +174,53 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     await pool.query("DELETE FROM courses WHERE id = $1", [id]);
     return { ok: true, notice: "Curso apagado." };
+  });
+
+  // Quantas pessoas receberiam o aviso de curso novo agora.
+  app.get("/admin/notify/audience", async (request) => {
+    requireAdmin(request);
+    const ids = await listNotifiableUserIds();
+    return { count: ids.length, running: isBroadcastRunning() };
+  });
+
+  // Dispara (uma única vez por curso) o aviso de curso novo pelo bot.
+  app.post<{ Params: { id: string } }>("/admin/courses/:id/notify", async (request, reply) => {
+    requireAdmin(request);
+    const { rows } = await pool.query(
+      `SELECT c.id, c.name, c.description, c.price_stars, c.cover_url, c.is_active, c.invite_link,
+              c.notified_at, cat.name AS category_name, cat.emoji AS category_emoji
+       FROM courses c JOIN categories cat ON cat.id = c.category_id
+       WHERE c.id = $1`,
+      [request.params.id]
+    );
+    const course = rows[0];
+    if (!course) return reply.code(404).send({ ok: false, error: "Curso não encontrado." });
+    if (!course.is_active) return reply.code(400).send({ ok: false, error: "O curso está oculto do catálogo." });
+    if (!course.invite_link) {
+      return reply.code(400).send({ ok: false, error: "Gere e salve o invite do curso antes de avisar os alunos." });
+    }
+    if (course.notified_at) {
+      return reply.code(409).send({ ok: false, error: "Os alunos já foram avisados sobre este curso." });
+    }
+
+    try {
+      const { total } = await broadcastNewCourse(
+        {
+          id: course.id,
+          name: course.name,
+          description: course.description,
+          priceStars: course.price_stars,
+          coverUrl: course.cover_url,
+          categoryName: course.category_name,
+          categoryEmoji: course.category_emoji,
+        },
+        request.log
+      );
+      await pool.query("UPDATE courses SET notified_at = now() WHERE id = $1", [course.id]);
+      return { ok: true, total };
+    } catch (err) {
+      return reply.code(409).send({ ok: false, error: (err as Error).message });
+    }
   });
 
   app.post("/admin/invite-link", async (request) => {

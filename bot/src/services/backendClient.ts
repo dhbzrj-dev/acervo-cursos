@@ -32,6 +32,19 @@ export function deactivateSubscription(params: {
   return callInternalApi("/internal/subscriptions/deactivate", params);
 }
 
+/** Guarda quem deu /start: essas pessoas podem receber avisos de cursos novos. */
+export function registerBotUser(params: {
+  telegramUserId: number;
+  firstName?: string;
+  username?: string;
+}): Promise<void> {
+  return callInternalApi("/internal/bot-users", params);
+}
+
+export function setNewCourseNotifications(telegramUserId: number, enabled: boolean): Promise<void> {
+  return callInternalApi("/internal/bot-users/notify", { telegramUserId, enabled });
+}
+
 export async function listToSync(days = 3) {
   const res = await fetch(
     `${env.backendUrl}/internal/subscriptions/to-sync?days=${days}`,

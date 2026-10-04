@@ -14,6 +14,7 @@ type Course = {
   channel_id?: string;
   is_active?: boolean;
   preview_url?: string;
+  notified_at?: string | null;
 };
 
 const SESSION_KEY = "admin_session";
@@ -214,6 +215,35 @@ export default function Admin() {
     alert("Invite gerado. Clique em salvar.");
   }
 
+  async function notifyCourse(course: Course) {
+    const audience = (await adminFetch("/admin/notify/audience").then((r) => r.json())) as {
+      count: number;
+      running: boolean;
+    };
+    if (audience.running) {
+      alert("Já existe um aviso sendo enviado. Aguarde alguns minutos.");
+      return;
+    }
+    if (audience.count === 0) {
+      alert("Ainda ninguém pode receber avisos. Quem der /start no bot ou abrir o app pelo bot entra na lista.");
+      return;
+    }
+    if (
+      !confirm(
+        `Enviar o aviso de curso novo "${course.name}" para ${audience.count} pessoa(s) pelo bot?\n\nCada curso só pode ser avisado uma vez.`
+      )
+    )
+      return;
+    const res = await adminFetch(`/admin/courses/${course.id}/notify`, { method: "POST" });
+    const data = (await res.json().catch(() => ({}))) as { total?: number; error?: string; message?: string };
+    alert(
+      res.ok
+        ? `Enviando para ${data.total} pessoa(s). Leva cerca de ${Math.max(1, Math.ceil((data.total ?? 0) / 1200))} minuto(s).`
+        : data.error || data.message || "Não foi possível enviar o aviso."
+    );
+    load();
+  }
+
   async function removeCourse(id: string) {
     if (!confirm("Apagar este curso?")) return;
     const res = await adminFetch(`/admin/courses/${id}`, { method: "DELETE" });
@@ -369,11 +399,21 @@ export default function Admin() {
         <h2 className="mb-3 text-lg font-semibold">Cursos</h2>
         <ul className="space-y-2">
           {courses.map((c) => (
-            <li key={c.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 p-3">
               <span>
                 {c.name} — {c.price_stars} ★{c.is_active === false ? " (oculto)" : ""}
+                {c.notified_at && (
+                  <span className="ml-2 text-xs text-muted">
+                    · avisado em {new Date(c.notified_at).toLocaleDateString("pt-BR")}
+                  </span>
+                )}
               </span>
               <span className="flex gap-3">
+                {!c.notified_at && c.is_active !== false && (
+                  <button type="button" onClick={() => notifyCourse(c)} className="text-amber-300">
+                    📣 Notificar alunos
+                  </button>
+                )}
                 <button type="button" onClick={() => editCourse(c)} className="text-sky-400">
                   Editar
                 </button>

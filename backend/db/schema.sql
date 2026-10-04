@@ -65,6 +65,20 @@ CREATE TABLE IF NOT EXISTS chat_bans (
   banned_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Quem pode receber avisos do bot (deu /start ou abriu o app pelo bot).
+CREATE TABLE IF NOT EXISTS bot_users (
+  telegram_user_id    BIGINT PRIMARY KEY,
+  first_name          TEXT,
+  username            TEXT,
+  notify_new_courses  BOOLEAN NOT NULL DEFAULT TRUE,
+  blocked_at          TIMESTAMPTZ,      -- bot bloqueado pelo usuário (403)
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Quando o aviso de "curso novo" foi disparado (evita notificar duas vezes).
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON user_subscriptions(telegram_user_id);
 CREATE INDEX IF NOT EXISTS idx_follows_category ON user_category_follows(category_id);

@@ -7,6 +7,7 @@ import {
   markRenewalReminderSent,
   upsertSubscription,
 } from "../repositories/subscriptions.repo.js";
+import { setNotifyNewCourses, upsertBotUser } from "../repositories/botUsers.repo.js";
 
 interface UpsertBody {
   telegramUserId: number;
@@ -58,6 +59,30 @@ export async function internalRoutes(app: FastifyInstance) {
       }
 
       await deactivateSubscription(telegramUserId, courseId);
+      reply.code(204).send();
+    }
+  );
+
+  // O bot registra quem deu /start (essas pessoas podem receber avisos).
+  app.post<{ Body: { telegramUserId: number; firstName?: string; username?: string } }>(
+    "/internal/bot-users",
+    async (request, reply) => {
+      const { telegramUserId, firstName, username } = request.body ?? ({} as never);
+      if (!telegramUserId) return reply.code(400).send({ error: "telegramUserId ausente." });
+      await upsertBotUser({ telegramUserId, firstName, username });
+      reply.code(204).send();
+    }
+  );
+
+  // Liga/desliga o aviso de cursos novos (botão "Parar avisos" e /avisos).
+  app.post<{ Body: { telegramUserId: number; enabled: boolean } }>(
+    "/internal/bot-users/notify",
+    async (request, reply) => {
+      const { telegramUserId, enabled } = request.body ?? ({} as never);
+      if (!telegramUserId || typeof enabled !== "boolean") {
+        return reply.code(400).send({ error: "Campos obrigatórios ausentes." });
+      }
+      await setNotifyNewCourses(telegramUserId, enabled);
       reply.code(204).send();
     }
   );

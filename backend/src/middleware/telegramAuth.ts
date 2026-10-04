@@ -24,6 +24,8 @@ export interface TelegramInitDataUser {
   last_name?: string;
   username?: string;
   photo_url?: string;
+  /** True quando o usuário permite que o bot escreva para ele. */
+  allows_write_to_pm?: boolean;
 }
 
 export interface ParsedInitData {
