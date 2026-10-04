@@ -1,4 +1,5 @@
 import PreviewPlayer from "@/components/PreviewPlayer";
+import { PaymentFaq, PaymentSheet, hasSeenPaymentGuide } from "@/components/PaymentGuide";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { fetchCourseById, fetchMySubscriptions, formatStars, formatRenewalDate } from "@/lib/api";
@@ -14,6 +15,7 @@ export default function CoursePage() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [guide, setGuide] = useState<"checkout" | "info" | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -49,16 +51,26 @@ export default function CoursePage() {
 
   const isSubscribed = Boolean(subscription);
 
-  const handleCta = () => {
-    hapticImpact("medium");
+  const openLink = () => {
+    setGuide(null);
     setRedirecting(true);
     openInviteLink(isSubscribed ? subscription!.channelDeepLink : course.inviteLink);
     hapticNotification("success");
     window.setTimeout(() => setRedirecting(false), 1200);
   };
 
+  const handleCta = () => {
+    hapticImpact("medium");
+    // Antes da primeira compra, explica o que vai acontecer no Telegram.
+    if (!isSubscribed && !hasSeenPaymentGuide()) {
+      setGuide("checkout");
+      return;
+    }
+    openLink();
+  };
+
   return (
-    <div className="pb-32">
+    <div className="pb-40">
       <div className="aspect-[16/10] w-full bg-[#1a1a1a]">
         <img
           src={course.coverUrl}
@@ -110,6 +122,8 @@ export default function CoursePage() {
             ))}
           </ul>
         </div>
+
+        {!isSubscribed && <PaymentFaq onShowSteps={() => setGuide("info")} />}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-bg/95 backdrop-blur px-4 pt-3 pb-[max(0.75rem,var(--tg-safe-bottom))]">
@@ -124,7 +138,24 @@ export default function CoursePage() {
             ? "Abrindo Telegram…"
             : `Assinar por ${formatStars(course.priceStars)} Stars/mês`}
         </button>
+        {!isSubscribed && (
+          <button
+            type="button"
+            onClick={() => setGuide("info")}
+            className="mt-2 w-full text-center text-[12.5px] text-muted underline-offset-2 active:underline"
+          >
+            Como funciona o pagamento?
+          </button>
+        )}
       </div>
+
+      <PaymentSheet
+        open={guide !== null}
+        mode={guide ?? "info"}
+        priceStars={course.priceStars}
+        onContinue={openLink}
+        onClose={() => setGuide(null)}
+      />
     </div>
   );
 }
