@@ -1,5 +1,23 @@
 import { useEffect, useState } from "react";
 import CoverCropper from "@/components/CoverCropper";
+import { parsePreviewUrl } from "@/lib/video";
+
+/** Diz na hora se o link do vídeo de amostra vai funcionar no app. */
+function PreviewHint({ url }: { url: string }) {
+  const source = parsePreviewUrl(url);
+  if (!source) return null;
+  if (source.kind === "youtube") {
+    return <p className="-mt-1 text-xs text-emerald-400">✓ Vídeo do YouTube reconhecido</p>;
+  }
+  if (source.kind === "file") {
+    return <p className="-mt-1 text-xs text-emerald-400">✓ Arquivo de vídeo reconhecido</p>;
+  }
+  return (
+    <p className="-mt-1 text-xs text-amber-300">
+      ⚠ Link não reconhecido: o vídeo não vai aparecer. Use um link do YouTube ou de um arquivo .mp4.
+    </p>
+  );
+}
 
 type Category = { id: string; name: string; emoji?: string; order?: number };
 type Course = {
@@ -371,10 +389,11 @@ export default function Admin() {
           )}
           <input
             className="rounded-xl bg-white/10 p-3"
-            placeholder="Vídeo de amostra .mp4"
+            placeholder="Vídeo de amostra: link do YouTube (não listado) ou .mp4"
             value={form.preview_url}
             onChange={(e) => setForm({ ...form, preview_url: e.target.value })}
           />
+          <PreviewHint url={form.preview_url} />
           <input
             className="rounded-xl bg-white/10 p-3"
             type="number"
