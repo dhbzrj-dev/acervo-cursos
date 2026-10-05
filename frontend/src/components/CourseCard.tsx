@@ -9,6 +9,8 @@ interface CourseCardProps {
   isFavorite?: boolean;
   onToggleFavorite?: (id: string) => void;
   badge?: "novo" | "top" | null;
+  /** Categoria do curso; omitida quando a lista já está filtrada por uma. */
+  category?: { name: string; emoji: string } | null;
 }
 
 export default function CourseCard({
@@ -17,6 +19,7 @@ export default function CourseCard({
   isFavorite,
   onToggleFavorite,
   badge,
+  category,
 }: CourseCardProps) {
   const navigate = useNavigate();
 
@@ -60,6 +63,12 @@ export default function CourseCard({
 
       <div className="flex flex-1 flex-col gap-3 p-3.5">
         <div className="flex-1">
+          {category && (
+            <p className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <span aria-hidden="true">{category.emoji}</span>
+              <span className="truncate">{category.name}</span>
+            </p>
+          )}
           <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
             {course.name}
           </h3>

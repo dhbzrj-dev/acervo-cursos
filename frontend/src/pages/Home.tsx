@@ -61,6 +61,11 @@ export default function Home() {
     };
   }, [reloadKey]);
 
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
+
   const subscribedIds = useMemo(
     () => new Set(subscriptions.filter((s) => s.active).map((s) => s.courseId)),
     [subscriptions]
@@ -209,6 +214,7 @@ export default function Home() {
                 isFavorite={favorites.has(course.id)}
                 onToggleFavorite={favorites.toggle}
                 badge={badgeFor(course)}
+                category={activeCategory === ALL_CATEGORY_ID ? categoryById.get(course.categoryId) : null}
               />
             ))}
           </div>
