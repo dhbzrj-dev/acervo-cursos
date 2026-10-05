@@ -1,3 +1,5 @@
+import VerifiedBadge from "@/components/VerifiedBadge";
+
 interface HeaderProps {
   query: string;
   onQueryChange: (value: string) => void;
@@ -13,8 +15,9 @@ export default function Header({
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-10 bg-bg/95 backdrop-blur pt-[max(1rem,var(--tg-safe-top))] px-4 pb-3">
-      <h1 className="text-[22px] font-bold tracking-tight text-ink">
+      <h1 className="flex items-center gap-1 text-[22px] font-bold tracking-tight text-ink">
         Olimpocursos
+        <VerifiedBadge />
       </h1>
 
       <div className="mt-3 flex items-center gap-2">
