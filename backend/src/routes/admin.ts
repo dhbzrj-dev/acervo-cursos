@@ -9,7 +9,7 @@ import {
   isBroadcastRunning,
   startBroadcast,
 } from "../lib/notifyNewCourse.js";
-import { getBotUserStats, listNotifiableUserIds } from "../repositories/botUsers.repo.js";
+import { getBotUserStats, listBotUsers, listNotifiableUserIds } from "../repositories/botUsers.repo.js";
 
 /**
  * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
@@ -199,6 +199,13 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get("/admin/bot-users/stats", async (request) => {
     requireAdmin(request);
     return { ...(await getBotUserStats()), running: isBroadcastRunning(), admins: adminTelegramIds().length };
+  });
+
+  // Lista de usuários do bot (nome e @), com busca.
+  app.get("/admin/bot-users", async (request) => {
+    requireAdmin(request);
+    const q = request.query as { q?: string; limit?: string };
+    return listBotUsers(String(q.q ?? ""), Number(q.limit ?? 100) || 100);
   });
 
   // Mensagem livre pelo bot. `test: true` envia só para os admins.

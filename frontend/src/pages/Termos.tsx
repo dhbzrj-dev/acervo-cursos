@@ -1,7 +1,7 @@
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 
 const SUPPORT_HANDLE = "@Olimpocursosreal";
-const UPDATED_AT = "4 de outubro de 2026";
+const UPDATED_AT = "5 de outubro de 2026";
 
 const SECTIONS: { title: string; body: string[] }[] = [
   {
@@ -41,8 +41,9 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: "6. Privacidade",
     body: [
-      "Guardamos apenas o necessário para o app funcionar: seu ID numérico do Telegram, os cursos que você assina com as datas de renovação, seu apelido na Sala e as mensagens que você escreve lá.",
-      "Seu nome e sua foto do Telegram aparecem só no seu Perfil, dentro do seu aparelho; não são gravados por nós.",
+      "Guardamos apenas o necessário para o app funcionar: seu ID numérico, nome e @ do Telegram (para enviar avisos pelo bot e prestar suporte), os cursos que você assina com as datas de renovação, seu apelido na Sala e as mensagens que você escreve lá.",
+      "Na Sala, os outros participantes veem só o seu apelido aleatório. Sua foto do Telegram não é gravada por nós.",
+      "Você pode parar de receber avisos a qualquer momento pelo botão “Parar avisos” ou pelo comando /avisos no bot.",
       "Não vendemos nem compartilhamos seus dados. Os dados ficam em provedores de infraestrutura usados para rodar o app.",
       `Você pode pedir a qualquer momento uma cópia ou a exclusão dos seus dados pelo suporte em ${SUPPORT_HANDLE}.`,
     ],

@@ -80,6 +80,8 @@ export default function BotUsersPanel({ adminFetch }: { adminFetch: AdminFetch }
         </p>
       )}
 
+      <UserList adminFetch={adminFetch} total={stats?.total ?? 0} />
+
       <div className="mt-4 rounded-xl border border-white/10 p-3">
         <p className="mb-2 text-sm font-semibold">Enviar mensagem pelo bot</p>
         <textarea
@@ -122,6 +124,93 @@ export default function BotUsersPanel({ adminFetch }: { adminFetch: AdminFetch }
         </div>
       </div>
     </section>
+  );
+}
+
+interface BotUser {
+  firstName: string | null;
+  username: string | null;
+  notify: boolean;
+  blocked: boolean;
+  createdAt: string;
+}
+
+/** Nome e @ de quem usa o bot. Só carrega quando aberta. */
+function UserList({ adminFetch, total }: { adminFetch: AdminFetch; total: number }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<BotUser[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await adminFetch(`/admin/bot-users?q=${encodeURIComponent(query)}&limit=200`);
+        setUsers((await res.json()) as BotUser[]);
+      } catch {
+        /* sessão expirada */
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, query]);
+
+  const date = (iso: string) =>
+    new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/10">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between p-3 text-sm font-semibold"
+      >
+        Ver usuários ({total})
+        <span className="text-muted">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="border-t border-white/10 p-3">
+          <input
+            className="mb-3 w-full rounded-xl bg-white/10 p-2.5 text-sm"
+            placeholder="Buscar por nome ou @"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {users === null ? (
+            <p className="text-sm text-muted">Carregando…</p>
+          ) : users.length === 0 ? (
+            <p className="text-sm text-muted">Ninguém encontrado.</p>
+          ) : (
+            <ul className="max-h-80 divide-y divide-white/5 overflow-y-auto">
+              {users.map((user, index) => (
+                <li key={`${user.username}-${user.createdAt}-${index}`} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate">{user.firstName || "Sem nome"}</span>
+                    {user.username ? (
+                      <a
+                        href={`https://t.me/${user.username}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-sky-400"
+                      >
+                        @{user.username}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted">sem @</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-right text-xs text-muted">
+                    {date(user.createdAt)}
+                    <span className="block">
+                      {user.blocked ? "bloqueou o bot" : user.notify ? "🔔 avisos" : "🔕 sem avisos"}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

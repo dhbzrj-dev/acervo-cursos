@@ -24,6 +24,36 @@ export async function upsertBotUser(user: {
   return { isNew: Boolean(rows[0]?.inserted) };
 }
 
+export interface BotUserRow {
+  firstName: string | null;
+  username: string | null;
+  notify: boolean;
+  blocked: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+/** Usuários do bot, mais recentes primeiro; `search` filtra por nome ou @. */
+export async function listBotUsers(search = "", limit = 100): Promise<BotUserRow[]> {
+  const term = search.trim().replace(/^@/, "");
+  const { rows } = await pool.query(
+    `SELECT first_name, username, notify_new_courses, blocked_at, created_at, last_seen_at
+     FROM bot_users
+     WHERE $1 = '' OR first_name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%'
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [term, Math.min(Math.max(limit, 1), 500)]
+  );
+  return rows.map((r) => ({
+    firstName: r.first_name,
+    username: r.username,
+    notify: r.notify_new_courses,
+    blocked: r.blocked_at !== null,
+    createdAt: r.created_at,
+    lastSeenAt: r.last_seen_at,
+  }));
+}
+
 export interface BotUserStats {
   total: number;
   today: number;
