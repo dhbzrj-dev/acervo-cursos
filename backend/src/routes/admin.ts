@@ -2,8 +2,14 @@
 import { pool } from "../db/pool.js";
 import { isCoverStorageConfigured, uploadCoverDataUrl } from "../lib/coverStorage.js";
 import { checkAdminPassword, createAdminToken, requireAdmin } from "../middleware/adminAuth.js";
-import { broadcastNewCourse, isBroadcastRunning } from "../lib/notifyNewCourse.js";
-import { listNotifiableUserIds } from "../repositories/botUsers.repo.js";
+import {
+  adminTelegramIds,
+  broadcastNewCourse,
+  buildCustomMessage,
+  isBroadcastRunning,
+  startBroadcast,
+} from "../lib/notifyNewCourse.js";
+import { getBotUserStats, listNotifiableUserIds } from "../repositories/botUsers.repo.js";
 
 /**
  * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
@@ -187,6 +193,39 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     await pool.query("DELETE FROM courses WHERE id = $1", [id]);
     return { ok: true, notice: "Curso apagado." };
+  });
+
+  // Números do bot para o painel.
+  app.get("/admin/bot-users/stats", async (request) => {
+    requireAdmin(request);
+    return { ...(await getBotUserStats()), running: isBroadcastRunning(), admins: adminTelegramIds().length };
+  });
+
+  // Mensagem livre pelo bot. `test: true` envia só para os admins.
+  app.post("/admin/broadcast", async (request, reply) => {
+    requireAdmin(request);
+    const body = (request.body || {}) as { text?: string; withAppButton?: boolean; test?: boolean };
+    const text = String(body.text ?? "").trim();
+    if (!text) return reply.code(400).send({ ok: false, error: "Escreva a mensagem." });
+    if (text.length > 3500) return reply.code(400).send({ ok: false, error: "Mensagem longa demais (máx. 3500 caracteres)." });
+
+    const ids = body.test ? adminTelegramIds() : await listNotifiableUserIds();
+    if (body.test && ids.length === 0) {
+      return reply.code(400).send({ ok: false, error: "Configure CHAT_ADMIN_IDS no Railway para receber o teste." });
+    }
+    if (ids.length === 0) return reply.code(400).send({ ok: false, error: "Ninguém na lista ainda." });
+
+    try {
+      const { total } = startBroadcast(
+        body.test ? "mensagem (teste)" : "mensagem",
+        ids,
+        buildCustomMessage(text, body.withAppButton !== false),
+        request.log
+      );
+      return { ok: true, total, test: Boolean(body.test) };
+    } catch (err) {
+      return reply.code(409).send({ ok: false, error: (err as Error).message });
+    }
   });
 
   // Quantas pessoas receberiam o aviso de curso novo agora.

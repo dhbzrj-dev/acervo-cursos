@@ -1,15 +1,20 @@
 import { listNotifiableUserIds, markBotUserBlocked } from "../repositories/botUsers.repo.js";
 
 /**
- * Aviso de "curso novo" para todos que aceitam receber avisos do bot.
- *
- * Roda em segundo plano (a rota do admin responde na hora) e envia ~20
- * mensagens por segundo, abaixo do limite do Telegram (~30/s). Quem
+ * Mensagens do bot para muitos usuários: aviso de curso novo e mensagens
+ * livres do painel. Roda em segundo plano (a rota responde na hora) e envia
+ * ~20 mensagens por segundo, abaixo do limite do Telegram (~30/s). Quem
  * bloqueou o bot é marcado e sai das próximas listas.
  */
 
 const DELAY_MS = 50;
 const MINI_APP_URL = (process.env.MINI_APP_URL || "https://acervo-cursos.vercel.app").replace(/\/+$/, "");
+
+export interface BotMessage {
+  text: string;
+  photo: string | null;
+  reply_markup?: { inline_keyboard: Record<string, unknown>[][] };
+}
 
 export interface NewCourseInfo {
   id: string;
@@ -21,13 +26,15 @@ export interface NewCourseInfo {
   categoryEmoji: string;
 }
 
+type Log = { info: (obj: unknown, msg?: string) => void; warn: (obj: unknown, msg?: string) => void };
+
 let running = false;
 
 export function isBroadcastRunning(): boolean {
   return running;
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
@@ -36,7 +43,17 @@ function excerpt(text: string, max = 180): string {
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 }
 
-export function buildNewCourseMessage(course: NewCourseInfo) {
+const STOP_BUTTON = { text: "🔕 Parar avisos", callback_data: "notify_off" };
+
+/** IDs do Telegram dos admins (mesma variável da moderação da Sala). */
+export function adminTelegramIds(): number[] {
+  return String(process.env.CHAT_ADMIN_IDS || "")
+    .split(/[,\s]+/)
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isFinite(id) && id > 0);
+}
+
+export function buildNewCourseMessage(course: NewCourseInfo): BotMessage {
   const price = new Intl.NumberFormat("pt-BR").format(course.priceStars);
   const lines = [
     `🆕 <b>Novo curso em ${escapeHtml(course.categoryEmoji)} ${escapeHtml(course.categoryName)}</b>`,
@@ -52,42 +69,55 @@ export function buildNewCourseMessage(course: NewCourseInfo) {
     reply_markup: {
       inline_keyboard: [
         [{ text: "📚 Ver curso", web_app: { url: `${MINI_APP_URL}/#/curso/${encodeURIComponent(course.id)}` } }],
-        [{ text: "🔕 Parar avisos", callback_data: "notify_off" }],
+        [STOP_BUTTON],
       ],
     },
     photo: /^https?:\/\//.test(course.coverUrl) ? course.coverUrl : null,
   };
 }
 
+/** Mensagem livre do painel: texto puro (escapado) + botão opcional do app. */
+export function buildCustomMessage(text: string, withAppButton: boolean): BotMessage {
+  const rows: Record<string, unknown>[][] = [];
+  if (withAppButton) rows.push([{ text: "📚 Abrir Olimpocursos", web_app: { url: MINI_APP_URL } }]);
+  rows.push([STOP_BUTTON]);
+  return { text: escapeHtml(text.trim()), photo: null, reply_markup: { inline_keyboard: rows } };
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function sendTo(chatId: number, message: ReturnType<typeof buildNewCourseMessage>) {
+type TelegramResult = {
+  ok: boolean;
+  error_code?: number;
+  description?: string;
+  parameters?: { retry_after?: number };
+};
+
+export async function sendBotMessage(chatId: number, message: BotMessage): Promise<TelegramResult> {
   const token = process.env.BOT_TOKEN;
   const method = message.photo ? "sendPhoto" : "sendMessage";
   const body = message.photo
     ? { chat_id: chatId, photo: message.photo, caption: message.text, parse_mode: "HTML", reply_markup: message.reply_markup }
     : { chat_id: chatId, text: message.text, parse_mode: "HTML", reply_markup: message.reply_markup };
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return (await res.json()) as {
-    ok: boolean;
-    error_code?: number;
-    description?: string;
-    parameters?: { retry_after?: number };
-  };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return (await res.json()) as TelegramResult;
+  } catch (err) {
+    return { ok: false, description: String(err) };
+  }
 }
 
-export async function broadcastNewCourse(
-  course: NewCourseInfo,
-  log: { info: (obj: unknown, msg?: string) => void; warn: (obj: unknown, msg?: string) => void }
-): Promise<{ total: number }> {
+/**
+ * Envia `message` para `ids` em segundo plano. Só um envio por vez.
+ * Retorna na hora com o total de destinatários.
+ */
+export function startBroadcast(label: string, ids: number[], message: BotMessage, log: Log): { total: number } {
   if (running) throw new Error("Já existe um envio em andamento. Aguarde terminar.");
-  const ids = await listNotifiableUserIds();
-  const message = buildNewCourseMessage(course);
   running = true;
 
   (async () => {
@@ -97,11 +127,7 @@ export async function broadcastNewCourse(
     try {
       for (const chatId of ids) {
         for (let attempt = 0; attempt < 3; attempt++) {
-          const result = await sendTo(chatId, message).catch((err) => ({
-            ok: false,
-            description: String(err),
-          }) as Awaited<ReturnType<typeof sendTo>>);
-
+          const result = await sendBotMessage(chatId, message);
           if (result.ok) {
             sent++;
             break;
@@ -115,7 +141,7 @@ export async function broadcastNewCourse(
             await markBotUserBlocked(chatId).catch(() => {});
           } else {
             failed++;
-            log.warn({ chatId, error: result.description }, "Falha ao avisar curso novo");
+            log.warn({ chatId, error: result.description }, `Falha no envio: ${label}`);
           }
           break;
         }
@@ -123,9 +149,15 @@ export async function broadcastNewCourse(
       }
     } finally {
       running = false;
-      log.info({ course: course.id, total: ids.length, sent, blocked, failed }, "Aviso de curso novo concluído");
+      log.info({ label, total: ids.length, sent, blocked, failed }, "Envio concluído");
     }
   })();
 
   return { total: ids.length };
+}
+
+export async function broadcastNewCourse(course: NewCourseInfo, log: Log): Promise<{ total: number }> {
+  if (running) throw new Error("Já existe um envio em andamento. Aguarde terminar.");
+  const ids = await listNotifiableUserIds();
+  return startBroadcast(`curso novo ${course.id}`, ids, buildNewCourseMessage(course), log);
 }

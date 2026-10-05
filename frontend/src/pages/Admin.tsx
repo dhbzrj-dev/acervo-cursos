@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import CoverCropper from "@/components/CoverCropper";
 import { parsePreviewUrl } from "@/lib/video";
 import CourseSizePicker from "@/components/CourseSizePicker";
+import BotUsersPanel from "@/components/BotUsersPanel";
 
 /** Diz na hora se o link do vídeo de amostra vai funcionar no app. */
 function PreviewHint({ url }: { url: string }) {
@@ -313,6 +314,8 @@ export default function Admin() {
           Sair
         </button>
       </div>
+
+      <BotUsersPanel adminFetch={adminFetch} />
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold">

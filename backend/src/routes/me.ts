@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { requireTelegramAuth } from "../middleware/telegramAuth.js";
 import { listSubscriptionsForUser } from "../repositories/subscriptions.repo.js";
-import { upsertBotUser } from "../repositories/botUsers.repo.js";
+import { registerBotUserAndAlert } from "../lib/newUserAlert.js";
 
 export async function meRoutes(app: FastifyInstance) {
   // Todas as rotas abaixo exigem o header `Authorization: tma <initData>`.
@@ -13,7 +13,11 @@ export async function meRoutes(app: FastifyInstance) {
     // Chamado a cada abertura do app: quem permite mensagens do bot entra
     // na lista de avisos de cursos novos.
     if (user.allows_write_to_pm) {
-      upsertBotUser({ telegramUserId: user.id, firstName: user.first_name, username: user.username }).catch(
+      registerBotUserAndAlert(
+        { telegramUserId: user.id, firstName: user.first_name, username: user.username },
+        "app",
+        request.log
+      ).catch(
         (err) => request.log.warn({ err }, "Falha ao registrar usuário do bot")
       );
     }

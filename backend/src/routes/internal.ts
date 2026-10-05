@@ -7,7 +7,8 @@ import {
   markRenewalReminderSent,
   upsertSubscription,
 } from "../repositories/subscriptions.repo.js";
-import { setNotifyNewCourses, upsertBotUser } from "../repositories/botUsers.repo.js";
+import { setNotifyNewCourses } from "../repositories/botUsers.repo.js";
+import { registerBotUserAndAlert } from "../lib/newUserAlert.js";
 
 interface UpsertBody {
   telegramUserId: number;
@@ -69,7 +70,7 @@ export async function internalRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { telegramUserId, firstName, username } = request.body ?? ({} as never);
       if (!telegramUserId) return reply.code(400).send({ error: "telegramUserId ausente." });
-      await upsertBotUser({ telegramUserId, firstName, username });
+      await registerBotUserAndAlert({ telegramUserId, firstName, username }, "start", request.log);
       reply.code(204).send();
     }
   );
