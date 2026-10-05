@@ -25,6 +25,13 @@ async function storeCover(
   }
 }
 
+/** Inteiro >= 0 ou null (campo vazio = "não informado"). */
+function optionalCount(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 function slug(text: string) {
   return String(text)
     .normalize("NFD")
@@ -110,8 +117,8 @@ export async function adminRoutes(app: FastifyInstance) {
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     const cover = await storeCover(b.cover_url, id, request.log);
     await pool.query(
-      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url, modules_count, lessons_count, duration_seconds)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         id,
         b.category_id,
@@ -124,6 +131,9 @@ export async function adminRoutes(app: FastifyInstance) {
         b.channel_id || "",
         b.is_active !== false,
         b.preview_url || "",
+        optionalCount(b.modules_count),
+        optionalCount(b.lessons_count),
+        optionalCount(b.duration_seconds),
       ]
     );
     return { ok: true, id };
@@ -137,7 +147,7 @@ export async function adminRoutes(app: FastifyInstance) {
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     const cover = await storeCover(b.cover_url, request.params.id, request.log);
     await pool.query(
-      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10 WHERE id=$11`,
+      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10, modules_count=$11, lessons_count=$12, duration_seconds=$13 WHERE id=$14`,
       [
         b.category_id,
         b.name,
@@ -149,6 +159,9 @@ export async function adminRoutes(app: FastifyInstance) {
         b.channel_id || "",
         b.is_active !== false,
         b.preview_url || "",
+        optionalCount(b.modules_count),
+        optionalCount(b.lessons_count),
+        optionalCount(b.duration_seconds),
         request.params.id,
       ]
     );

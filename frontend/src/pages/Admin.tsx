@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import CoverCropper from "@/components/CoverCropper";
 import { parsePreviewUrl } from "@/lib/video";
+import CourseSizePicker from "@/components/CourseSizePicker";
 
 /** Diz na hora se o link do vídeo de amostra vai funcionar no app. */
 function PreviewHint({ url }: { url: string }) {
@@ -33,6 +34,9 @@ type Course = {
   is_active?: boolean;
   preview_url?: string;
   notified_at?: string | null;
+  modules_count?: number | null;
+  lessons_count?: number | null;
+  duration_seconds?: number | null;
 };
 
 const SESSION_KEY = "admin_session";
@@ -78,6 +82,9 @@ export default function Admin() {
     channel_id: "",
     is_active: true,
     preview_url: "",
+    modules_count: "" as number | "",
+    lessons_count: "" as number | "",
+    duration_seconds: "" as number | "",
   });
   function logout() {
     try {
@@ -197,6 +204,9 @@ export default function Admin() {
       channel_id: course.channel_id || "",
       is_active: course.is_active !== false,
       preview_url: course.preview_url || "",
+      modules_count: course.modules_count ?? "",
+      lessons_count: course.lessons_count ?? "",
+      duration_seconds: course.duration_seconds ?? "",
     });
   }
 
@@ -394,6 +404,14 @@ export default function Admin() {
             onChange={(e) => setForm({ ...form, preview_url: e.target.value })}
           />
           <PreviewHint url={form.preview_url} />
+          <CourseSizePicker
+            value={{
+              modules_count: form.modules_count,
+              lessons_count: form.lessons_count,
+              duration_seconds: form.duration_seconds,
+            }}
+            onChange={(size) => setForm({ ...form, ...size })}
+          />
           <input
             className="rounded-xl bg-white/10 p-3"
             type="number"

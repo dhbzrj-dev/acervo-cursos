@@ -76,6 +76,11 @@ CREATE TABLE IF NOT EXISTS bot_users (
   last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Tamanho do curso, calculado no painel a partir da pasta de vídeos.
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS modules_count INTEGER;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS lessons_count INTEGER;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS duration_seconds INTEGER;
+
 -- Quando o aviso de "curso novo" foi disparado (evita notificar duas vezes).
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
 

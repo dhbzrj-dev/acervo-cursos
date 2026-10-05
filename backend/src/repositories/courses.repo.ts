@@ -14,6 +14,9 @@ export interface CourseRow {
   createdAt: string;
   studentsCount: number;
   previewUrl: string;
+  modulesCount: number | null;
+  lessonsCount: number | null;
+  durationSeconds: number | null;
 }
 
 function mapRow(row: any): CourseRow {
@@ -31,13 +34,16 @@ function mapRow(row: any): CourseRow {
     createdAt: row.created_at,
     studentsCount: Number(row.students_count ?? 0),
     previewUrl: row.preview_url ?? "",
+    modulesCount: row.modules_count ?? null,
+    lessonsCount: row.lessons_count ?? null,
+    durationSeconds: row.duration_seconds ?? null,
   };
 }
 
 const SELECT = `
   SELECT c.id, c.category_id, c.name, c.description, c.benefits, c.cover_url,
          c.price_stars, c.invite_link, c.channel_id, c.is_active, c.created_at,
-         c.preview_url,
+         c.preview_url, c.modules_count, c.lessons_count, c.duration_seconds,
          (SELECT COUNT(*)::int FROM user_subscriptions s
           WHERE s.course_id = c.id AND s.active = TRUE) AS students_count
   FROM courses c

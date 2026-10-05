@@ -1,5 +1,6 @@
 import PreviewPlayer from "@/components/PreviewPlayer";
 import { PaymentFaq, PaymentSheet, hasSeenPaymentGuide } from "@/components/PaymentGuide";
+import { formatCourseSize } from "@/lib/courseStats";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { fetchCourseById, fetchMySubscriptions, formatStars, formatRenewalDate } from "@/lib/api";
@@ -50,6 +51,7 @@ export default function CoursePage() {
   }
 
   const isSubscribed = Boolean(subscription);
+  const courseSize = formatCourseSize(course);
 
   const openLink = () => {
     setGuide(null);
@@ -98,6 +100,13 @@ export default function CoursePage() {
         {typeof course.studentsCount === "number" && (
           <p className="mt-1 text-[13px] text-muted">
             {new Intl.NumberFormat("pt-BR").format(course.studentsCount)} alunos
+          </p>
+        )}
+
+        {courseSize && (
+          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-ink">
+            <span aria-hidden="true">🎬</span>
+            {courseSize}
           </p>
         )}
 

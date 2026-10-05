@@ -19,6 +19,9 @@ export interface Course {
   createdAt?: string;
   previewUrl?: string;
   studentsCount?: number;
+  modulesCount?: number | null;
+  lessonsCount?: number | null;
+  durationSeconds?: number | null;
 }
 
 export interface UserSubscription {
