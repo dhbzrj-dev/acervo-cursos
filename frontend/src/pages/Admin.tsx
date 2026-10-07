@@ -4,6 +4,12 @@ import { parsePreviewUrl } from "@/lib/video";
 import CourseSizePicker from "@/components/CourseSizePicker";
 import BotUsersPanel from "@/components/BotUsersPanel";
 
+/** IDs de canal começam com "-100"; aceita o número colado sem o "-". */
+function normalizeChannelId(raw: string): string {
+  const value = raw.replace(/\s+/g, "");
+  return /^100\d{6,}$/.test(value) ? `-${value}` : value;
+}
+
 /** Diz na hora se o link do vídeo de amostra vai funcionar no app. */
 function PreviewHint({ url }: { url: string }) {
   const source = parsePreviewUrl(url);
@@ -244,12 +250,13 @@ export default function Admin() {
       ok: boolean;
       error?: string;
       invite_link?: string;
+      channel_id?: string;
     };
     if (!data.ok || !data.invite_link) {
       alert(data.error || "Falha ao gerar invite");
       return;
     }
-    setForm({ ...form, invite_link: data.invite_link });
+    setForm({ ...form, invite_link: data.invite_link, channel_id: data.channel_id || form.channel_id });
     alert("Invite gerado. Clique em salvar.");
   }
 
@@ -426,7 +433,14 @@ export default function Admin() {
             placeholder="Channel ID -100..."
             value={form.channel_id}
             onChange={(e) => setForm({ ...form, channel_id: e.target.value })}
+            onBlur={() => setForm((f) => ({ ...f, channel_id: normalizeChannelId(f.channel_id) }))}
           />
+          {form.channel_id && !/^-100\d{6,}$/.test(normalizeChannelId(form.channel_id)) && (
+            <p className="-mt-1 text-xs text-amber-300">
+              ⚠ O ID do canal começa com -100 (ex.: -1003371971167). Abra o canal em web.telegram.org/a/ e copie o
+              número da barra de endereço.
+            </p>
+          )}
           <div className="flex gap-2">
             <input
               className="flex-1 rounded-xl bg-white/10 p-3"

@@ -31,6 +31,27 @@ async function storeCover(
   }
 }
 
+/** IDs de canal começam com "-100"; aceita o número colado sem o "-". */
+function normalizeChannelId(raw: unknown): string {
+  const value = String(raw ?? "").replace(/\s+/g, "");
+  return /^100\d{6,}$/.test(value) ? `-${value}` : value;
+}
+
+/** Traduz os erros do Telegram ao gerar o invite em instruções práticas. */
+function explainInviteError(description?: string): string {
+  const d = String(description || "");
+  if (/chat not found/i.test(d)) {
+    return "O bot não encontrou o canal. Confira: 1) o ID começa com -100; 2) @olimpocursosappbot é administrador do canal.";
+  }
+  if (/not enough rights|need administrator|CHAT_ADMIN_REQUIRED/i.test(d)) {
+    return "O bot está no canal, mas sem permissão. Ligue “Convidar usuários via link” para @olimpocursosappbot.";
+  }
+  if (/SUBSCRIPTION|price|amount/i.test(d)) {
+    return "Preço inválido para assinatura: use de 1 a 2500 Stars.";
+  }
+  return d ? `Telegram: ${d}` : "Falha ao criar invite";
+}
+
 /** Inteiro >= 0 ou null (campo vazio = "não informado"). */
 function optionalCount(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -134,7 +155,7 @@ export async function adminRoutes(app: FastifyInstance) {
         cover,
         Number(b.price_stars || 0),
         b.invite_link || "",
-        b.channel_id || "",
+        normalizeChannelId(b.channel_id),
         b.is_active !== false,
         b.preview_url || "",
         optionalCount(b.modules_count),
@@ -162,7 +183,7 @@ export async function adminRoutes(app: FastifyInstance) {
         cover,
         Number(b.price_stars || 0),
         b.invite_link || "",
-        b.channel_id || "",
+        normalizeChannelId(b.channel_id),
         b.is_active !== false,
         b.preview_url || "",
         optionalCount(b.modules_count),
@@ -287,18 +308,19 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = request.body as { channel_id: string; price_stars: number; name?: string };
     const token = process.env.BOT_TOKEN;
     if (!token) return { ok: false, error: "BOT_TOKEN ausente" };
+    const channelId = normalizeChannelId(body.channel_id);
     const telegramRes = await fetch(`https://api.telegram.org/bot${token}/createChatSubscriptionInviteLink`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: body.channel_id,
+        chat_id: channelId,
         name: (body.name || "Assinatura").slice(0, 32),
         subscription_period: 2592000,
         subscription_price: Number(body.price_stars),
       }),
     });
     const telegramJson: any = await telegramRes.json();
-    if (!telegramJson.ok) return { ok: false, error: telegramJson.description || "Falha ao criar invite" };
-    return { ok: true, invite_link: telegramJson.result.invite_link };
+    if (!telegramJson.ok) return { ok: false, error: explainInviteError(telegramJson.description) };
+    return { ok: true, invite_link: telegramJson.result.invite_link, channel_id: channelId };
   });
 }
