@@ -81,6 +81,16 @@ ALTER TABLE courses ADD COLUMN IF NOT EXISTS modules_count INTEGER;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS lessons_count INTEGER;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS duration_seconds INTEGER;
 
+-- Preço do curso original (pagamento único), em centavos de real.
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS original_price_cents INTEGER;
+
+-- Configurações gerais do app (ex.: quanto custam 100 Stars em reais).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Quando o aviso de "curso novo" foi disparado (evita notificar duas vezes).
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
 

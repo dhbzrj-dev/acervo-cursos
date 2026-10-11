@@ -30,6 +30,7 @@ export const mockCourses: Course[] = [
     coverUrl:
       "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&q=80",
     priceStars: 1200,
+    originalPriceCents: 199700,
     inviteLink: "https://t.me/+exemplo_invite_react",
     channelId: "-1001111111111",
     isActive: true,
@@ -50,6 +51,7 @@ export const mockCourses: Course[] = [
     coverUrl:
       "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80",
     priceStars: 900,
+    originalPriceCents: 85790,
     inviteLink: "https://t.me/+exemplo_invite_design",
     channelId: "-1001111111112",
     isActive: true,

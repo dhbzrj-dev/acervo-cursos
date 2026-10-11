@@ -24,6 +24,8 @@ function rememberPaymentGuide(seen: boolean) {
 interface PaymentSheetProps {
   open: boolean;
   priceStars: number;
+  /** Equivalente mensal em reais, ex. "R$ 29,75" (opcional). */
+  priceBrl?: string | null;
   /** "checkout" mostra o botão de continuar; "info" só explica. */
   mode: "checkout" | "info";
   onContinue: () => void;
@@ -34,7 +36,7 @@ interface PaymentSheetProps {
  * Bottom sheet com o passo a passo do pagamento, mostrado ao tocar em
  * "Assinar" — o aluno sabe o que vai acontecer antes de sair do app.
  */
-export function PaymentSheet({ open, priceStars, mode, onContinue, onClose }: PaymentSheetProps) {
+export function PaymentSheet({ open, priceStars, priceBrl, mode, onContinue, onClose }: PaymentSheetProps) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export function PaymentSheet({ open, priceStars, mode, onContinue, onClose }: Pa
           Como funciona o pagamento
         </h2>
         <p className="mt-1 text-[13px] text-muted">
-          {price} por mês, em Telegram Stars.
+          {price} por mês{priceBrl ? ` (≈ ${priceBrl})` : ""}, em Telegram Stars.
         </p>
 
         <ol className="mt-5 flex flex-col">

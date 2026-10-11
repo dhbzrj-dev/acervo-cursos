@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { Course } from "@/types";
 import { formatStars } from "@/lib/api";
+import { formatBRL, priceView } from "@/lib/pricing";
 import { hapticImpact, openInviteLink } from "@/lib/telegram";
 
 interface CourseCardProps {
@@ -11,6 +12,8 @@ interface CourseCardProps {
   badge?: "novo" | "top" | null;
   /** Categoria do curso; omitida quando a lista já está filtrada por uma. */
   category?: { name: string; emoji: string } | null;
+  /** Quanto custam 100 Stars em reais (para o "≈ R$"). */
+  brlPer100Stars?: number | null;
 }
 
 export default function CourseCard({
@@ -20,8 +23,10 @@ export default function CourseCard({
   onToggleFavorite,
   badge,
   category,
+  brlPer100Stars,
 }: CourseCardProps) {
   const navigate = useNavigate();
+  const price = priceView(course, brlPer100Stars);
 
   const handleCtaClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,10 +77,22 @@ export default function CourseCard({
           <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
             {course.name}
           </h3>
-          <p className="mt-1 text-[13px] font-medium text-ink/90">
-            {formatStars(course.priceStars)} ★{" "}
-            <span className="font-normal text-muted">/ mês</span>
+          {price.originalCents && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted">
+              <span className="line-through decoration-muted/70">{formatBRL(price.originalCents)}</span>
+              {price.discountPercent && (
+                <span className="rounded-md bg-emerald-500/15 px-1.5 py-px text-[11px] font-bold text-emerald-400">
+                  −{price.discountPercent}%
+                </span>
+              )}
+            </p>
+          )}
+          <p className={`text-[14px] font-bold text-ink ${price.originalCents ? "mt-0.5" : "mt-1"}`}>
+            {formatStars(course.priceStars)} ★ <span className="text-[12px] font-normal text-muted">/ mês</span>
           </p>
+          {price.monthlyCents && (
+            <p className="text-[12px] text-muted">≈ {formatBRL(price.monthlyCents)}/mês</p>
+          )}
         </div>
 
         <button

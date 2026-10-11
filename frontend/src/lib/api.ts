@@ -100,6 +100,26 @@ export async function fetchCategories(): Promise<Category[]> {
   return apiGet<Category[]>("/categories");
 }
 
+export interface AppConfig {
+  /** Quanto custam 100 Stars em reais (null = não configurado). */
+  brlPer100Stars: number | null;
+}
+
+let configPromise: Promise<AppConfig> | null = null;
+
+/** Configurações públicas da vitrine; carregadas uma vez por sessão. */
+export function fetchConfig(): Promise<AppConfig> {
+  if (!configPromise) {
+    configPromise = USE_MOCKS
+      ? delay(FAKE_LATENCY_MS).then(() => ({ brlPer100Stars: 11.9 }))
+      : apiGet<AppConfig>("/config").catch(() => {
+          configPromise = null;
+          return { brlPer100Stars: null };
+        });
+  }
+  return configPromise;
+}
+
 export async function fetchCourses(): Promise<Course[]> {
   if (USE_MOCKS) {
     await delay(FAKE_LATENCY_MS);

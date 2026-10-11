@@ -10,6 +10,7 @@ import {
   startBroadcast,
 } from "../lib/notifyNewCourse.js";
 import { getBotUserStats, listBotUsers, listNotifiableUserIds } from "../repositories/botUsers.repo.js";
+import { setBrlPer100Stars } from "../repositories/settings.repo.js";
 
 /**
  * O painel manda a capa recortada como data URL. Se o Vercel Blob estiver
@@ -144,8 +145,8 @@ export async function adminRoutes(app: FastifyInstance) {
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     const cover = await storeCover(b.cover_url, id, request.log);
     await pool.query(
-      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url, modules_count, lessons_count, duration_seconds)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      `INSERT INTO courses (id, category_id, name, description, benefits, cover_url, price_stars, invite_link, channel_id, is_active, preview_url, modules_count, lessons_count, duration_seconds, original_price_cents)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         id,
         b.category_id,
@@ -161,6 +162,7 @@ export async function adminRoutes(app: FastifyInstance) {
         optionalCount(b.modules_count),
         optionalCount(b.lessons_count),
         optionalCount(b.duration_seconds),
+        optionalCount(b.original_price_cents),
       ]
     );
     return { ok: true, id };
@@ -174,7 +176,7 @@ export async function adminRoutes(app: FastifyInstance) {
       : String(b.benefits || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     const cover = await storeCover(b.cover_url, request.params.id, request.log);
     await pool.query(
-      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10, modules_count=$11, lessons_count=$12, duration_seconds=$13 WHERE id=$14`,
+      `UPDATE courses SET category_id=$1, name=$2, description=$3, benefits=$4, cover_url=$5, price_stars=$6, invite_link=$7, channel_id=$8, is_active=$9, preview_url=$10, modules_count=$11, lessons_count=$12, duration_seconds=$13, original_price_cents=$14 WHERE id=$15`,
       [
         b.category_id,
         b.name,
@@ -189,6 +191,7 @@ export async function adminRoutes(app: FastifyInstance) {
         optionalCount(b.modules_count),
         optionalCount(b.lessons_count),
         optionalCount(b.duration_seconds),
+        optionalCount(b.original_price_cents),
         request.params.id,
       ]
     );
@@ -214,6 +217,21 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     await pool.query("DELETE FROM courses WHERE id = $1", [id]);
     return { ok: true, notice: "Curso apagado." };
+  });
+
+  // Conversão Stars -> R$ usada nos preços ("≈ R$").
+  app.put("/admin/config", async (request) => {
+    requireAdmin(request);
+    const body = (request.body || {}) as { brlPer100Stars?: number | string | null };
+    const raw = body.brlPer100Stars;
+    const value = raw === null || raw === "" || raw === undefined ? null : Number(String(raw).replace(",", "."));
+    if (value !== null && !(Number.isFinite(value) && value > 0 && value < 100000)) {
+      const err: Error & { statusCode?: number } = new Error("Valor inválido para 100 Stars em reais.");
+      err.statusCode = 400;
+      throw err;
+    }
+    await setBrlPer100Stars(value);
+    return { ok: true, brlPer100Stars: value };
   });
 
   // Números do bot para o painel.

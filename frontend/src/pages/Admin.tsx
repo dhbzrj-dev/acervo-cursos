@@ -3,6 +3,8 @@ import CoverCropper from "@/components/CoverCropper";
 import { parsePreviewUrl } from "@/lib/video";
 import CourseSizePicker from "@/components/CourseSizePicker";
 import BotUsersPanel from "@/components/BotUsersPanel";
+import StarsRateSetting from "@/components/StarsRateSetting";
+import { centsToInput, parseBRLToCents } from "@/lib/pricing";
 
 /** IDs de canal começam com "-100"; aceita o número colado sem o "-". */
 function normalizeChannelId(raw: string): string {
@@ -44,6 +46,7 @@ type Course = {
   modules_count?: number | null;
   lessons_count?: number | null;
   duration_seconds?: number | null;
+  original_price_cents?: number | null;
 };
 
 const SESSION_KEY = "admin_session";
@@ -92,6 +95,7 @@ export default function Admin() {
     modules_count: "" as number | "",
     lessons_count: "" as number | "",
     duration_seconds: "" as number | "",
+    original_price_brl: "",
   });
   function logout() {
     try {
@@ -214,6 +218,7 @@ export default function Admin() {
       modules_count: course.modules_count ?? "",
       lessons_count: course.lessons_count ?? "",
       duration_seconds: course.duration_seconds ?? "",
+      original_price_brl: centsToInput(course.original_price_cents),
     });
   }
 
@@ -222,7 +227,7 @@ export default function Admin() {
     const path = editingId ? `/admin/courses/${editingId}` : "/admin/courses";
     const res = await adminFetch(path, {
       method: editingId ? "PUT" : "POST",
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, original_price_cents: parseBRLToCents(form.original_price_brl) }),
     });
     if (!res.ok) {
       alert("Erro ao salvar curso");
@@ -323,6 +328,7 @@ export default function Admin() {
       </div>
 
       <BotUsersPanel adminFetch={adminFetch} />
+      <StarsRateSetting adminFetch={adminFetch} />
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold">
@@ -422,12 +428,29 @@ export default function Admin() {
             }}
             onChange={(size) => setForm({ ...form, ...size })}
           />
-          <input
-            className="rounded-xl bg-white/10 p-3"
-            type="number"
-            value={form.price_stars}
-            onChange={(e) => setForm({ ...form, price_stars: Number(e.target.value) })}
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Preço do curso original (R$)
+              <input
+                inputMode="decimal"
+                className="rounded-xl bg-white/10 p-3 text-sm text-ink"
+                placeholder="ex.: 857,90"
+                value={form.original_price_brl}
+                onChange={(e) => setForm({ ...form, original_price_brl: e.target.value })}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Preço no Olimpocursos (⭐/mês)
+              <input
+                className="rounded-xl bg-white/10 p-3 text-sm text-ink"
+                type="number"
+                min={1}
+                max={2500}
+                value={form.price_stars}
+                onChange={(e) => setForm({ ...form, price_stars: Number(e.target.value) })}
+              />
+            </label>
+          </div>
           <input
             className="rounded-xl bg-white/10 p-3"
             placeholder="Channel ID -100..."

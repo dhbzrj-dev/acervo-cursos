@@ -1,9 +1,10 @@
 import PreviewPlayer from "@/components/PreviewPlayer";
 import { PaymentFaq, PaymentSheet, hasSeenPaymentGuide } from "@/components/PaymentGuide";
 import { formatCourseSize } from "@/lib/courseStats";
+import { formatBRL, priceView } from "@/lib/pricing";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { fetchCourseById, fetchMySubscriptions, formatStars, formatRenewalDate } from "@/lib/api";
+import { fetchConfig, fetchCourseById, fetchMySubscriptions, formatStars, formatRenewalDate } from "@/lib/api";
 import type { Course, UserSubscription } from "@/types";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 import { hapticImpact, hapticNotification, openInviteLink } from "@/lib/telegram";
@@ -17,6 +18,11 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
   const [guide, setGuide] = useState<"checkout" | "info" | null>(null);
+  const [brlPer100Stars, setBrlPer100Stars] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchConfig().then((config) => setBrlPer100Stars(config.brlPer100Stars));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -52,6 +58,7 @@ export default function CoursePage() {
 
   const isSubscribed = Boolean(subscription);
   const courseSize = formatCourseSize(course);
+  const price = priceView(course, brlPer100Stars);
 
   const openLink = () => {
     setGuide(null);
@@ -86,10 +93,35 @@ export default function CoursePage() {
           {course.name}
         </h1>
 
-        <p className="mt-2 text-[26px] font-extrabold text-ink">
-          {formatStars(course.priceStars)} ★
-          <span className="ml-1.5 text-[15px] font-medium text-muted">/ mês</span>
-        </p>
+        <div className="mt-3">
+          {price.originalCents && (
+            <p className="text-[13px] text-muted">
+              Curso original{" "}
+              <span className="line-through decoration-muted/70">{formatBRL(price.originalCents)}</span>
+              <span className="ml-1 text-[11.5px]">(pagamento único)</span>
+            </p>
+          )}
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <p className="text-[26px] font-extrabold leading-tight text-ink">
+              {formatStars(course.priceStars)} ★
+              <span className="ml-1.5 text-[15px] font-medium text-muted">/ mês</span>
+            </p>
+            {price.discountPercent && (
+              <span className="rounded-lg bg-emerald-500/15 px-2 py-1 text-[13px] font-bold text-emerald-400">
+                −{price.discountPercent}%
+              </span>
+            )}
+          </div>
+          {price.monthlyCents && (
+            <p className="text-[14px] font-medium text-ink/85">≈ {formatBRL(price.monthlyCents)} por mês</p>
+          )}
+          {!isSubscribed && price.savingsCents && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[13px] font-semibold text-emerald-400">
+              <span aria-hidden="true">💸</span>
+              Você economiza {formatBRL(price.savingsCents)} no 1º mês
+            </p>
+          )}
+        </div>
 
         {isSubscribed && subscription && (
           <p className="mt-1 text-[13px] font-medium text-muted">
@@ -162,6 +194,7 @@ export default function CoursePage() {
         open={guide !== null}
         mode={guide ?? "info"}
         priceStars={course.priceStars}
+        priceBrl={price.monthlyCents ? formatBRL(price.monthlyCents) : null}
         onContinue={openLink}
         onClose={() => setGuide(null)}
       />

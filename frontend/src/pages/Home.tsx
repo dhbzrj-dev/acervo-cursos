@@ -4,7 +4,7 @@ import CategoryPill from "@/components/CategoryPill";
 import CourseCard from "@/components/CourseCard";
 import CourseCardSkeleton from "@/components/CourseCardSkeleton";
 import EmptyState from "@/components/EmptyState";
-import { fetchCategories, fetchCourses, fetchMySubscriptions } from "@/lib/api";
+import { fetchCategories, fetchConfig, fetchCourses, fetchMySubscriptions } from "@/lib/api";
 import type { Category, Course, UserSubscription } from "@/types";
 import { useTelegramBackButton } from "@/hooks/useTelegram";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -24,6 +24,7 @@ export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [brlPer100Stars, setBrlPer100Stars] = useState<number | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [activeCategory, setActiveCategory] = useState(ALL_CATEGORY_ID);
@@ -32,6 +33,10 @@ export default function Home() {
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("default");
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    fetchConfig().then((config) => setBrlPer100Stars(config.brlPer100Stars));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,6 +220,7 @@ export default function Home() {
                 onToggleFavorite={favorites.toggle}
                 badge={badgeFor(course)}
                 category={activeCategory === ALL_CATEGORY_ID ? categoryById.get(course.categoryId) : null}
+                brlPer100Stars={brlPer100Stars}
               />
             ))}
           </div>

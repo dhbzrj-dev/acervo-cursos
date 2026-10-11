@@ -22,6 +22,8 @@ export interface Course {
   modulesCount?: number | null;
   lessonsCount?: number | null;
   durationSeconds?: number | null;
+  /** Preço do curso original (pagamento único), em centavos. */
+  originalPriceCents?: number | null;
 }
 
 export interface UserSubscription {
